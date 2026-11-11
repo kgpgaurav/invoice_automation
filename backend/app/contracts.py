@@ -44,3 +44,17 @@ class RunStatus(BaseModel):
     @classmethod
     def utc_timestamp(cls, value: datetime) -> datetime:
         return value.astimezone(UTC)
+
+
+class RunEventResponse(BaseModel):
+    run_id: UUID
+    seq: int
+    type: str
+    stage: str
+    occurred_at: AwareDatetime
+    payload: dict
+
+    @field_validator("occurred_at")
+    @classmethod
+    def utc_timestamp(cls, value: datetime) -> datetime:
+        return value.astimezone(UTC)

@@ -1,4 +1,56 @@
-# Slice 1: local infrastructure and durable intake
+# Development and verification
+
+## Current Slice 2: worker infrastructure (2026-11-11)
+
+Closure review 2026-11-12: reviewed the complete Slice 2 tracked diff against 97757cf plus all new worker/migration/test files. Ownership uses a dedicated connection that is invalidated (physically closed) on release; lease recovery cannot take a live session lock; owner/attempt/deadline fence mutations; claims, retries and events commit together; failure rolls back the claim and releases its lock; exhaustion never creates a financial decision. Migration down/up and event deduplication are covered by regression tests. No critical defect was found. Full regression: 32 passed in 31.34s, one existing TestClient warning; Ruff check/format and frontend production build passed. Git diff whitespace check passed and no remote exists. Slice 2 is committed separately before financial work; the earlier uncommitted statement below is historical.
+
+Read [DECISIONS.md](DECISIONS.md) for the worker contract refinement recorded before implementation. SPEC §§1.2, 3.1, 3.4, 4.1–4.2 and 5.5 govern this slice. Financial policy and existing endpoint contracts remain unchanged.
+
+Git is initialized. The clean Slice 1 baseline is `97757cf` (includes ignore hardening). Verified ignored examples: backend/.env, backend/.venv, .local/pgdata, uploads, arbitrary PDFs, SQLite files and private-key files. The staged baseline contained only source/docs/lockfiles and the deliberate local-development .env.example. No API-key/private-key marker matches were found. No remote was configured or pushed. Sandbox/user ownership differed, so Git required an execution-scoped safe.directory exception and approved .git writes; no global Git safety setting was changed. Baseline whitespace check flagged only existing SPEC Markdown hard breaks and its final blank line, preserved verbatim.
+
+New/changed files:
+
+- `app/worker.py`: separate-process worker engine, atomic SKIP LOCKED claims, dedicated session lock per run, unique owner/attempt fencing, heartbeat, bounded technical retries, expired-owner recovery and transactional lifecycle writes. Defaults: 30s lease, 10s heartbeat, three attempts and 5s exponential retry delay capped at 60s.
+- `app/events.py`: transaction-owned append helper; run row lock serializes sequence allocation; operation keys deduplicate identical events and reject conflicting reuse. Events are never changed by the helper.
+- `models.py`, `alembic/versions/0002_worker.py`: nullable event operation key/unique constraint, active-run lease uniqueness and queue eligibility index. Migration 0001 remains unchanged.
+- `contracts.py`, `main.py`: authenticated `GET /api/v1/runs/{id}/events?after_seq=0&limit=100`, returning an ordered list of §4.2 envelopes. Limit 1–500, after_seq >= 0, unknown run 404; timestamps UTC. Run status notice reflects disabled production processing. Existing frontend source is unchanged.
+- `tests/worker_harness.py`, `test_worker.py`, `test_worker_retry.py`, `tests/__init__.py`: explicit subprocess test processors and integration checks. No test processor is bundled into the application CLI.
+- Generated `frontend/openapi.json` and `src/api.generated.ts`: include the planned events endpoint; no unrelated UI changes.
+
+### Running and activation boundary
+
+From backend, use the existing setup below, then `uv run alembic upgrade head`. The worker process entrypoint is `uv run python -m app.worker`. **It intentionally exits 2 with “Production processing disabled … No jobs claimed.”** It does not load credentials, connect or mutate queued uploads. There is no production enable switch. `Worker.run(stop_event)` provides the execution loop; its per-job `run_once` path is tested in separate processes through explicitly injected test callbacks. Only PROCESS queue work is eligible in this slice. Tests acknowledge infrastructure work as queue DONE / run INTERRUPTED with TEST_PROCESSOR_ONLY and a null decision; no invoice COMPLETED/APPROVED result or extraction stage is fabricated.
+
+Recovery runs while claiming eligible work, not as a startup blanket update. Only expired LEASED rows whose run session lock is free are returned to READY (run INTERRUPTED) or failed after the claim budget. Work retains its original PDF, run, thread and generation; business re-evaluation/new-run behavior remains deferred. Queue work and events commit together. Retry failures store generic codes/messages rather than raw exceptions or document contents.
+
+The API readiness endpoint now expects migration 0002. Migrations are explicit, never on API/worker startup. Tests use isolated random PostgreSQL schemas and include both revisions in metadata parity and full down/up checks. Run `uv run pytest -q` with TEST_DATABASE_URL as below. Worker tests terminate their own subprocesses; no user process is killed. The competition and crash tests use real separate processes, while tests control the database lease deadline to avoid long sleeps.
+
+### Limits and unresolved activation requirements
+
+Session advisory locks require a direct or session-pooled PostgreSQL connection; transaction pooling is unsupported. A live process with an expired lease keeps its lock, so recovery waits for that process/connection to end. This deliberately favors serialization over availability. Attempt fencing prevents stale DB writes after requeue/reclaim; arbitrary CPU computation or external side effects cannot be made exactly once if a connection dies or a process crashes before committing. Test callbacks can repeat uncommitted computation. Future processors must cooperate with fencing and idempotency; financial posting still requires SPEC §2.3.
+
+Production activation remains blocked on a real processor, checkpoint/ledger reconciliation, typed financial contracts, and graph/review work in later slices. No checkpoint/ledger reconciliation is claimed here because those tables and processors do not exist. SSE, browser timeline rendering, hosted deployment and live extraction remain deferred. Ordered events are available to polling clients without modifying the frontend. The existing Slice 1 smoke script still checks only queued intake, which is valid with production processing disabled.
+
+### Slice 2 verification record
+
+Final commands used the project virtual environment in backend, with `TEST_DATABASE_URL=postgresql+psycopg://ps1@127.0.0.1:55432/postgres`. All database tests used random isolated schemas on the project-only PostgreSQL 17 cluster.
+
+| Command | Final observed result |
+|---|---|
+| `python -m pytest -q` | **32 passed in 26.40s** (20 Slice 1 regressions + 12 worker/events tests); one existing upstream Starlette/httpx TestClient deprecation warning |
+| `ruff check .` | Passed |
+| `ruff format --check .` | Passed; 22 Python files |
+| `python -m scripts.export_openapi` | Passed |
+| `npm.cmd run generate:api` | Passed |
+| `npm.cmd run build` | TypeScript and Vite production bundle passed; 28 modules |
+| `git diff --check` against baseline | Passed; informational Windows LF/CRLF notices only |
+| `git remote -v` | Empty; no remote configured or contacted |
+
+Coverage includes real competing subprocesses, actual process termination/restart, heartbeat extension, live-owner exclusion even after lease expiry, stale attempt rejection, bounded technical retries/backoff/exhaustion, stable operation replay across attempts, conflicting event rejection, duplicate completion acknowledgement, injected database failures rolling back claim/event/state changes, concurrent intake, authenticated/cursor-ordered event reads and disabled production CLI behavior. Migration metadata parity and downgrade/re-upgrade tests cover revision 0002 as well as 0001. Test output had no failures; initial Ruff import/format findings were fixed before the final check.
+
+Environment failures: initial sandbox Git commands hit ownership and .git index write restrictions; scoped ownership exceptions plus approved Git execution created the baseline successfully. A diagnostic process inventory query was denied by the sandbox; subprocess test results and bounded cleanup verified completion without needing that inventory. No global Git configuration was changed. The isolated PostgreSQL cluster started for this task was stopped after verification; the existing port-5432 service was not modified. Slice 2 changes remain uncommitted for review against baseline `97757cf`.
+
+## Slice 1 historical setup and verification
 
 SPEC.md v0.2-draft remains canonical. Read AGENTS.md and SPEC.md before changes. See [DECISIONS.md](DECISIONS.md) for unresolved contracts, local choices, tradeoffs and implementation order. README.md remains the original planning document because AGENTS.md restricts its edits to explicit agreed contract changes.
 

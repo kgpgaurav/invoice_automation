@@ -27,7 +27,22 @@ Implement SPEC §§1.2, 3.1, 3.4, 4.1 and the initial upload shell from §4.3. T
 - Runs lack explicit columns for extraction/schema/input-path versions, canonical retry linkage and per-run policy snapshot despite narrative requirements. Add these with the relevant slice, documenting the proposed representation first. Run detail/pagination/error envelopes are only partially specified; this slice exposes a minimal typed status subset, not a full extraction response.
 - No Git repository is initialized in this folder. Source files can be created and tested, but Git diff/commit checks are unavailable.
 
-## Implementation order
+## Slice 2 contract proposal (recorded before implementation)
+
+Scope: SPEC §§1.2, 3.1, 3.4, 4.1–4.2 and 5.5. No financial or existing HTTP contract changes. The spec omits queue statuses, fencing, retry limits and an event idempotency key; these are internal refinements proposed under the user's Slice 2 instruction.
+
+- Queue READY → LEASED → DONE or FAILED; technical retries return to READY on the same run/thread/document. This distinguishes infrastructure retries from §1.2's new-run business re-evaluation. Defaults: lease 30s, heartbeat 10s, max 3 claims, retry delay 5/10/20s capped at 60s. DB clock controls eligibility/expiry. Attempts increment only on committed claims.
+- Claim with SKIP LOCKED and hold a dedicated session advisory lock for the run until processing exits. Expired leases are recoverable only if that lock is free; a paused live owner cannot race a replacement. Attempt number and unique claim owner fence all writes. Session locks require a direct/session-pooled DB connection, not transaction pooling. A dead process releases its connection/lock; a live stuck process prioritizes safety over availability and needs termination.
+- Claims and retries persist actual WORKER-stage lifecycle events using existing allowed event types. No extraction or approval events. Event sequence is allocated while holding the run row lock; a new nullable unique (run_id,event_key) deduplicates operation replay. Conflicting reuse fails and rolls back. Event reads use after_seq and bounded limit, returning the existing §4.2 envelope.
+- Retry exhaustion is FAILED with null financial decision. A test processor's return only acknowledges queue work and leaves the run INTERRUPTED with TEST_PROCESSOR_ONLY; never COMPLETED or a business verdict. Test processors exist only in tests and are injected explicitly; the production CLI fails closed before claiming any job. No runtime arbitrary import/processor switch.
+- No ledger/checkpoint tables exist yet. Recovery is deliberately restricted to this test-only infrastructure; a real processor must implement checkpoint/ledger reconciliation before activation. Exactly-once arbitrary computation/external side effects cannot be promised after a crash; this slice guarantees serialized ownership, fenced DB writes and idempotent committed events, not zero repeated computation.
+- Migration adds only event deduplication and queue indexes. Existing intake and status schemas remain compatible. Frontend source stays unchanged; generated API schema/types include the planned events endpoint. SSE remains deferred.
+
+Acceptance: all Slice 1 regressions; competing processes, killed owner and restart, live expired owner exclusion, heartbeat/fencing, retry exhaustion, duplicate/conflicting events, transaction rollback and concurrent intake. Implement in worker/events modules, migration 0002, API events route and focused integration tests.
+
+The proposal is implemented as an internal refinement under the requested scope; SPEC financial rules and existing endpoint contracts are unchanged. Existing event type vocabulary is reused, with stage WORKER and explicit operation payloads. Polling clients can use the new planned endpoint without any UI changes. Production CLI exits 2 before loading settings or connecting. A processor crash may repeat uncommitted computation: processors must use fenced/idempotent effects. If a DB connection is lost while CPU work continues, session-lock exclusivity no longer covers that CPU work; lease/attempt checks reject stale DB writes after recovery. Arbitrary external side effects remain out of scope. PostgreSQL session locks follow the [official locking documentation](https://www.postgresql.org/docs/17/explicit-locking.html).
+
+## Implementation order (remaining roadmap)
 
 1. This slice: config, database migration/connectivity, health/readiness, bounded authenticated PDF intake, queued status UI and PostgreSQL tests.
 2. Durable single-worker claiming/events/recovery with explicit stub labels; fixture definitions/reset; generated frontend types from OpenAPI (already used for the implemented subset).

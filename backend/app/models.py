@@ -6,11 +6,13 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,6 +55,8 @@ class Run(Base):
 
 class RunEvent(Base):
     __tablename__ = "run_events"
+    __table_args__ = (UniqueConstraint("run_id", "event_key"),)
+    event_key: Mapped[str | None] = mapped_column(String(200))
     run_id: Mapped[UUID] = mapped_column(ForeignKey("runs.id"), primary_key=True)
     seq: Mapped[int] = mapped_column(primary_key=True)
     stage: Mapped[str] = mapped_column(String(40))
@@ -65,7 +69,13 @@ class RunEvent(Base):
 
 class QueueItem(Base):
     __tablename__ = "run_queue"
-    __table_args__ = (UniqueConstraint("run_id", "work_type", "generation"),)
+    __table_args__ = (
+        UniqueConstraint("run_id", "work_type", "generation"),
+        Index(
+            "uq_run_active_lease", "run_id", unique=True, postgresql_where=text("status = 'LEASED'")
+        ),
+        Index("ix_queue_ready", "status", "next_attempt_at"),
+    )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     run_id: Mapped[UUID] = mapped_column(ForeignKey("runs.id"))
     work_type: Mapped[str] = mapped_column(String(30), default="PROCESS")

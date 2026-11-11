@@ -5,7 +5,7 @@ from uuid import UUID
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
@@ -13,10 +13,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.contracts import API_PREFIX, MAX_PDF_BYTES, Health, IntakeResponse, RunStatus
+from app.contracts import (
+    API_PREFIX,
+    MAX_PDF_BYTES,
+    Health,
+    IntakeResponse,
+    RunEventResponse,
+    RunStatus,
+)
 from app.db import make_engine
 from app.intake import create_intake, validate_pdf
-from app.models import Run
+from app.models import Run, RunEvent
 
 
 def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
@@ -124,8 +131,39 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                 thread_id=run.thread_id,
                 created_at=run.created_at,
                 replay_mode=run.replay_mode,
-                implementation_notice="Intake skeleton: no worker or AI extraction implemented. "
-                "This run remains queued; no financial decision was made.",
+                implementation_notice="Infrastructure only: no worker processor or AI extraction "
+                "is enabled. No financial decision was made.",
             )
+
+    @app.get(
+        f"{API_PREFIX}/runs/{{run_id}}/events",
+        response_model=list[RunEventResponse],
+        dependencies=[Depends(require_auth)],
+    )
+    def get_events(
+        run_id: UUID,
+        after_seq: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    ):
+        with Session(engine) as session:
+            if session.get(Run, run_id) is None:
+                raise HTTPException(404, detail="Run not found.")
+            events = session.scalars(
+                select(RunEvent)
+                .where(RunEvent.run_id == run_id, RunEvent.seq > after_seq)
+                .order_by(RunEvent.seq)
+                .limit(limit)
+            )
+            return [
+                RunEventResponse(
+                    run_id=e.run_id,
+                    seq=e.seq,
+                    type=e.type,
+                    stage=e.stage,
+                    occurred_at=e.occurred_at,
+                    payload=e.payload_json,
+                )
+                for e in events
+            ]
 
     return app
