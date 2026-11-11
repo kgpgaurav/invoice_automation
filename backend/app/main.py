@@ -24,6 +24,9 @@ from app.contracts import (
 from app.db import make_engine
 from app.intake import create_intake, validate_pdf
 from app.models import Run, RunEvent
+from app.review_contracts import ReviewAccepted, ReviewCandidate, ReviewResponse, ReviewView
+from app.reviews import ReviewConflict, respond
+from app.workflow_models import ReviewRequest
 
 
 def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
@@ -56,6 +59,19 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                 detail="Valid bearer credential required.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+    def require_reviewer(
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ):
+        if (
+            settings.reviewer_api_token is None
+            or credentials is None
+            or not secrets.compare_digest(
+                credentials.credentials.encode(),
+                settings.reviewer_api_token.get_secret_value().encode(),
+            )
+        ):
+            raise HTTPException(403, detail="Configured reviewer credential required.")
 
     @app.exception_handler(SQLAlchemyError)
     async def database_unavailable(request, error):
@@ -131,8 +147,12 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                 thread_id=run.thread_id,
                 created_at=run.created_at,
                 replay_mode=run.replay_mode,
-                implementation_notice="Infrastructure only: no worker processor or AI extraction "
-                "is enabled. No financial decision was made.",
+                implementation_notice=(
+                    "Queued: no worker has processed this run. No financial decision was made."
+                    if run.model_id == "not-configured"
+                    else "Controlled processing requires explicit operator opt-in. "
+                    "Approval authorizes downstream processing; no payment is executed."
+                ),
             )
 
     @app.get(
@@ -165,5 +185,65 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                 )
                 for e in events
             ]
+
+    @app.get(
+        f"{API_PREFIX}/runs/{{run_id}}/review",
+        response_model=ReviewView,
+        dependencies=[Depends(require_auth)],
+    )
+    def get_review(run_id: UUID):
+        with Session(engine) as session:
+            request = session.scalar(
+                select(ReviewRequest).where(
+                    ReviewRequest.run_id == run_id, ReviewRequest.status == "OPEN"
+                )
+            )
+            if request is None:
+                raise HTTPException(404, detail="No open review request.")
+            from app.financial_models import PurchaseOrder
+
+            candidates = []
+            for po_id in request.options_json:
+                po = session.get(PurchaseOrder, UUID(po_id))
+                candidates.append(
+                    ReviewCandidate(
+                        po_id=po_id,
+                        po_number=po.po_number if po else None,
+                        currency=po.currency if po else None,
+                        status=po.status if po else "UNAVAILABLE",
+                        remaining_gross=str(po.approved_cap_gross - po.committed_gross)
+                        if po
+                        else None,
+                    )
+                )
+            return ReviewView(
+                review_request_id=request.id,
+                run_id=request.run_id,
+                generation=request.generation,
+                kind=request.kind,
+                question=request.question,
+                options=candidates,
+                status=request.status,
+                allowed_actions=(["SELECT_PO"] if request.kind == "PO_SELECTION" else [])
+                + ["REJECT", "REQUEST_INFO"],
+            )
+
+    @app.post(
+        f"{API_PREFIX}/reviews/{{review_id}}/respond",
+        response_model=ReviewAccepted,
+        status_code=202,
+        dependencies=[Depends(require_reviewer)],
+    )
+    def respond_review(
+        review_id: UUID,
+        body: ReviewResponse,
+        key: Annotated[str, Header(alias="X-Idempotency-Key", min_length=1, max_length=200)],
+    ):
+        try:
+            return respond(engine, review_id, body, key, "configured-reviewer")
+        except LookupError:
+            raise HTTPException(404, detail="Review request not found.") from None
+        except ReviewConflict as error:
+            raise HTTPException(409, detail=str(error)) from None
 
     return app

@@ -1,9 +1,9 @@
-"""Separate-process execution infrastructure. Production processor intentionally absent."""
+"""Separate-process execution; real processing requires explicit operator opt-in."""
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
-from threading import Event, Thread
+from threading import Event, RLock, Thread
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func, or_, select, text
@@ -40,6 +40,7 @@ class Claim:
     owner: str
     attempt: int
     connection: object
+    mutex: object = field(default_factory=RLock)
 
     def close(self):
         # Physically close: session advisory locks must never return to the pool.
@@ -63,7 +64,13 @@ class Worker:
                 now = session.scalar(select(func.clock_timestamp()))
                 jobs = session.scalars(
                     select(QueueItem)
-                    .where(QueueItem.work_type == "PROCESS")
+                    .where(
+                        QueueItem.work_type.in_(
+                            ("PROCESS", "RESUME")
+                            if getattr(self.processor, "durable_workflow", False)
+                            else ("PROCESS",)
+                        )
+                    )
                     .where(
                         or_(
                             and_(QueueItem.status == "READY", QueueItem.next_attempt_at <= now),
@@ -82,17 +89,23 @@ class Worker:
                     if not locked:
                         continue
                     run = session.scalar(select(Run).where(Run.id == job.run_id).with_for_update())
-                    if run.job_state not in ("QUEUED", "RUNNING", "INTERRUPTED"):
+                    workflow = getattr(self.processor, "durable_workflow", False)
+                    terminal = workflow and run.decision in ("APPROVED", "REJECTED")
+                    if not terminal and run.job_state not in ("QUEUED", "RUNNING", "INTERRUPTED"):
                         raise RuntimeError("Unsupported run state; reconciliation required")
                     if job.status == "LEASED":
-                        self._retry(session, job, run, "LEASE_EXPIRED", now)
+                        if terminal:
+                            self._reconcile_committed(session, job, run, now)
+                        else:
+                            self._retry(session, job, run, "LEASE_EXPIRED", now)
                         # Recovery commits first; delayed READY work is claimed next time.
                         return None
                     job.status = "LEASED"
                     job.attempts += 1
                     job.claimed_by = str(uuid4())
                     job.lease_until = now + timedelta(seconds=self.policy.lease_seconds)
-                    run.job_state, run.error_code, run.reason = "RUNNING", None, None
+                    if not terminal:
+                        run.job_state, run.error_code, run.reason = "RUNNING", None, None
                     run.updated_at = now
                     append_event(
                         session,
@@ -114,7 +127,10 @@ class Worker:
 
     def _owned(self, session, claim):
         job = session.scalar(
-            select(QueueItem).where(QueueItem.id == claim.job_id).with_for_update()
+            select(QueueItem)
+            .where(QueueItem.id == claim.job_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         now = session.scalar(select(func.clock_timestamp()))
         if (
@@ -159,7 +175,31 @@ class Worker:
             {"operation": code, "attempt": job.attempts, "retry": not exhausted},
         )
 
+    def _reconcile_committed(self, session, job, run, now):
+        job.status, job.lease_until, job.claimed_by = "READY", None, None
+        job.next_attempt_at = now
+        append_event(
+            session,
+            run.id,
+            f"{job.id}:{job.attempts}:reconcile",
+            "STAGE_FAILED",
+            {"operation": "RECOVER_COMMITTED_DECISION", "financial_post_unchanged": True},
+        )
+
     def finish(self, claim, failed=False):
+        if getattr(self.processor, "durable_workflow", False):
+            from app.ownership import owned_session
+
+            with owned_session(self, claim) as session:
+                job, now = self._owned(session, claim)
+                run = session.scalar(select(Run).where(Run.id == claim.run_id).with_for_update())
+                if not failed:
+                    raise RuntimeError("Workflow must complete through its fenced finalizer")
+                if run.decision in ("APPROVED", "REJECTED"):
+                    self._reconcile_committed(session, job, run, now)
+                else:
+                    self._retry(session, job, run, "PROCESSOR_ERROR", now)
+            return
         with Session(self.engine) as session, session.begin():
             existing = session.scalar(
                 select(QueueItem).where(QueueItem.id == claim.job_id).with_for_update()
@@ -174,7 +214,13 @@ class Worker:
             job, now = self._owned(session, claim)
             run = session.scalar(select(Run).where(Run.id == job.run_id).with_for_update())
             if failed:
-                self._retry(session, job, run, "PROCESSOR_ERROR", now)
+                if getattr(self.processor, "durable_workflow", False) and run.decision in (
+                    "APPROVED",
+                    "REJECTED",
+                ):
+                    self._reconcile_committed(session, job, run, now)
+                else:
+                    self._retry(session, job, run, "PROCESSOR_ERROR", now)
             else:
                 # This boundary only supports explicit infrastructure test processors.
                 job.status, job.lease_until = "DONE", None
@@ -214,6 +260,8 @@ class Worker:
                 self.processor(self, claim, pdf)
             except Exception:
                 failed = True
+            if not failed and getattr(self.processor, "durable_workflow", False):
+                return True  # Graph processor already committed its fenced completion/park.
             if lost.is_set():
                 raise LostLease("Heartbeat failed; recovery required")
             self.finish(claim, failed=failed)
@@ -230,11 +278,57 @@ class Worker:
 
 
 def main():
-    print(
-        "Production processing disabled: no real processor exists. No jobs claimed.",
-        file=sys.stderr,
-    )
-    return 2
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Controlled PS-1 worker")
+    parser.add_argument("--enable-processing", action="store_true")
+    parser.add_argument("--setup-checkpoints", action="store_true")
+    parser.add_argument("--policy-version")
+    parser.add_argument("--once", action="store_true")
+    args = parser.parse_args()
+    if not args.enable_processing and not args.setup_checkpoints:
+        print(
+            "Processing disabled. No jobs claimed. Use explicit operator opt-in.", file=sys.stderr
+        )
+        return 2
+    from app.config import Settings
+    from app.db import make_engine
+
+    engine = make_engine(Settings())
+    try:
+        if args.setup_checkpoints:
+            from app.checkpoints import setup_checkpoints
+
+            setup_checkpoints(engine)
+            return 0
+        if not args.policy_version:
+            parser.error("--policy-version must name an already registered policy")
+        from app.extraction_client import OpenAIExtractor
+        from app.workflow import WorkflowProcessor
+
+        settings = Settings()
+        extractor = OpenAIExtractor(
+            settings.openai_api_key.get_secret_value() if settings.openai_api_key else None,
+            settings.openai_model,
+        )
+        try:
+            processor = WorkflowProcessor(engine, extractor, args.policy_version)
+            processor.check_ready()
+            worker = Worker(engine, processor)
+            if args.once:
+                worker.run_once()
+            else:
+                import signal
+
+                stop = Event()
+                signal.signal(signal.SIGINT, lambda *_: stop.set())
+                signal.signal(signal.SIGTERM, lambda *_: stop.set())
+                worker.run(stop)
+        finally:
+            extractor.close()
+        return 0
+    finally:
+        engine.dispose()
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app import (
     extraction_store,  # noqa: F401
     financial_models,  # noqa: F401
+    workflow_models,  # noqa: F401
 )
 from app.db import Base
 

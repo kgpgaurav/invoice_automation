@@ -57,3 +57,13 @@ def pdf():
     with pymupdf.open() as document:
         document.new_page().insert_text((72, 72), "Test intake PDF. No AI extraction.")
         return document.tobytes()
+
+
+@pytest.fixture
+def workflow_db(database):
+    from tests.workflow_helpers import setup, teardown
+
+    engine = database[0]
+    setup(engine)
+    yield engine
+    teardown(engine)

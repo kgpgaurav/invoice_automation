@@ -1,5 +1,25 @@
 # PS-1 implementation progress
 
+Slice 5 closure for Slice 6A: reviewed against ba58c43 and verified **141 passed / 2 opt-in skips**, Ruff, migrations, generated types, frontend build and Git checks. No critical defect found. Slice 5 is committed as a separate baseline before Slice 6A; older uncommitted references below are historical. No push.
+
+## Current: Slice 5 complete, uncommitted for review
+
+Slice 4 was reviewed against df517a4, corrected without evidence exemptions, and committed separately as **ba58c43**. Clean and alternate-layout PDFs now both pass the strict local-evidence-to-financial regression. No remote push occurred. SPEC remains canonical; financial policy defaults are unchanged.
+
+Slice 5 integrates the separate worker, OpenAI Responses extraction, deterministic financial engine and typed LangGraph with PostgreSQL checkpoints. The worker-owned finalizer proves physical advisory-lock ownership and owner/attempt/deadline fencing, re-verifies the original PDF and uses the existing atomic locked ledger transaction. Checkpoint replay cannot double-post funds. Private extraction/history and version metadata remain outside graph state.
+
+Real PO-selection interrupts publish only after durable checkpointing, retire the queue lease and release worker ownership while waiting. Minimal authenticated review APIs use closed actions, generation and idempotency. Resume acquires fresh ownership on the same thread, revalidates vendor/PO/quantities/taxes/balance/duplicates/policy, and cannot waive spending limits. Rejection and request-info work without extraction; request-info stops rather than looping.
+
+**Verification: 141 routine tests passed, 2 paid live tests skipped by default.** This preserves all original 114 regressions, adds 3 Slice 4 closure regressions and 24 Slice 5 routine cases. Ruff check/format, locked dependency check, real PostgreSQL migration upgrade/downgrade/metadata parity, generated API reproducibility, frontend TypeScript/Vite build and Git whitespace/ignored-secret checks passed. Abrupt exits before financial commit and after commit/before checkpoint recover in a fresh process with one ledger entry, unchanged original PDF and no repeat model call. Concurrent PO approvals cannot overspend; review conflicts/replay, changed balances, injected rollback, malformed extraction and checkpoint-before-review-publication recovery are covered.
+
+**Explicit live H1 passed** using configured gpt-6-luna, a real synthetic PDF and isolated synthetic masters: extraction → local evidence → deterministic approval → one immutable ledger allocation. One Responses request, 1122 input / 1349 output tokens, 0 cached / 1119 cache-write tokens, 13.25s model latency, estimated USD **0.0008146750**; actual billing unknown. The disposable schemas were removed. See [live report](docs/benchmarks/slice5-live-h1.json).
+
+Default worker invocation still exits without claiming jobs. Controlled operation requires explicit --enable-processing, registered immutable policy/masters, checkpoint setup and configured OpenAI credentials/model. The opt-in flag does not establish unrestricted production readiness. Single-reviewer token auth is local; broad real-layout grounding, scan corroboration, the >=20 real-document gold set, full tax profiles, valid H2 rounding evidence and deployed hosting/identity remain open. Existing UI is still the intake/status shell; review is an API path. No payment, email, ERP writes, review UI, SSE or exports were added.
+
+Exact file manifest, reproduction commands, transaction/recovery contracts and observed failures/results: [DEVELOPMENT.md](docs/DEVELOPMENT.md) and [DECISIONS.md](docs/DECISIONS.md). Slice 5 is deliberately **uncommitted**. The records below are the historical Slice 4 handoff, superseded by this status.
+
+## Historical Slice 4 handoff
+
 Canonical requirements: SPEC.md. Archived plans are historical. Updated 2026-11-12.
 
 | Slice | State | Evidence |

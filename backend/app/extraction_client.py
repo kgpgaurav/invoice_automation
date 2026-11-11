@@ -89,7 +89,19 @@ class OpenAIExtractor:
         except httpx.HTTPError:
             raise ExtractionError("OPENAI_CONNECTION_ERROR") from None
 
-    def extract(self, pdf, route="text", record=lambda _: None, rates=None):
+    def extract(
+        self,
+        pdf,
+        route="text",
+        record=lambda _: None,
+        rates=None,
+        *,
+        before_attempt=lambda _: None,
+        max_attempts=2,
+        feedback=None,
+    ):
+        if not 1 <= max_attempts <= 2:
+            raise ExtractionError("EXTRACTION_ATTEMPTS_EXHAUSTED")
         local = inspect_pdf(pdf, route)
         content = [{"type": "input_text", "text": local.text}]
         if route == "pdf":
@@ -101,7 +113,9 @@ class OpenAIExtractor:
                 }
             ]
         repair = ""
-        for attempt in range(2):
+        for attempt in range(max_attempts):
+            attempt_id = str(uuid4())
+            before_attempt(attempt_id)
             started = time.monotonic()
             data, usage, code, result = {}, None, None, None
             retry = False
@@ -110,7 +124,7 @@ class OpenAIExtractor:
                     "/responses",
                     json={
                         "model": self.model,
-                        "instructions": INSTRUCTIONS + repair,
+                        "instructions": INSTRUCTIONS + (feedback or "") + repair,
                         "store": False,
                         "max_output_tokens": 10000,
                         "text": {"format": output_format()},
@@ -151,7 +165,7 @@ class OpenAIExtractor:
                 cost = estimated_cost(usage, rates)
                 record(
                     {
-                        "attempt_id": str(uuid4()),
+                        "attempt_id": attempt_id,
                         "attempt": attempt + 1,
                         "model_id": data.get("model")
                         if isinstance(data.get("model"), str)
@@ -169,6 +183,6 @@ class OpenAIExtractor:
                 )
             if result is not None:
                 return result
-            if not retry or attempt == 1:
+            if not retry or attempt + 1 == max_attempts:
                 raise ExtractionError(code or "EXTRACTION_FAILED")
             self.sleep(1)

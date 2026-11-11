@@ -230,6 +230,117 @@
           }
         }
       }
+    },
+    "/api/v1/runs/{run_id}/review": {
+      "get": {
+        "summary": "Get Review",
+        "operationId": "get_review_api_v1_runs__run_id__review_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reviews/{review_id}/respond": {
+      "post": {
+        "summary": "Respond Review",
+        "operationId": "respond_review_api_v1_reviews__review_id__respond_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Id"
+            }
+          },
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "X-Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewResponse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -345,6 +456,198 @@
           "INTERRUPTED"
         ],
         "title": "JobState"
+      },
+      "ReviewAccepted": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "review_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Request Id"
+          },
+          "job_state": {
+            "type": "string",
+            "const": "QUEUED",
+            "title": "Job State",
+            "default": "QUEUED"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "review_request_id"
+        ],
+        "title": "ReviewAccepted"
+      },
+      "ReviewCandidate": {
+        "properties": {
+          "po_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Po Id"
+          },
+          "po_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Po Number"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "remaining_gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Gross"
+          }
+        },
+        "type": "object",
+        "required": [
+          "po_id",
+          "po_number",
+          "currency",
+          "status",
+          "remaining_gross"
+        ],
+        "title": "ReviewCandidate"
+      },
+      "ReviewPayload": {
+        "properties": {
+          "po_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Po Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReviewPayload"
+      },
+      "ReviewResponse": {
+        "properties": {
+          "generation": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Generation"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "SELECT_PO",
+              "REJECT",
+              "REQUEST_INFO"
+            ],
+            "title": "Action"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ReviewPayload"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "generation",
+          "action",
+          "payload",
+          "reason"
+        ],
+        "title": "ReviewResponse"
+      },
+      "ReviewView": {
+        "properties": {
+          "review_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Request Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewCandidate"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "allowed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_request_id",
+          "run_id",
+          "generation",
+          "kind",
+          "question",
+          "options",
+          "allowed_actions",
+          "status"
+        ],
+        "title": "ReviewView"
       },
       "RunEventResponse": {
         "properties": {

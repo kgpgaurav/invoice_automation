@@ -1,0 +1,19 @@
+{
+  "mode": "LIVE_OPENAI_SYNTHETIC_H1",
+  "model": "gpt-6-luna",
+  "decision": "APPROVED",
+  "ledger_entries": 1,
+  "actual_billing_cost": null,
+  "attempts": [
+    {
+      "input_tokens": "1122",
+      "cached_tokens": "0",
+      "cache_write_tokens": "1119",
+      "output_tokens": "1349",
+      "latency_ms": "13250",
+      "estimated_cost_usd": "0.0008146750",
+      "rate_source": "2026-11-12 https://developers.openai.com/api/docs/models/gpt-6-luna",
+      "error_code": null
+    }
+  ]
+}

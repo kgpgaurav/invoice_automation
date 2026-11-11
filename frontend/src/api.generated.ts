@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Review */
+        get: operations["get_review_api_v1_runs__run_id__review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/{review_id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Respond Review */
+        post: operations["respond_review_api_v1_reviews__review_id__respond_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -138,6 +172,84 @@ export interface components {
          * @enum {string}
          */
         JobState: "QUEUED" | "RUNNING" | "WAITING_REVIEW" | "COMPLETED" | "FAILED" | "INTERRUPTED";
+        /** ReviewAccepted */
+        ReviewAccepted: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Review Request Id
+             * Format: uuid
+             */
+            review_request_id: string;
+            /**
+             * Job State
+             * @default QUEUED
+             * @constant
+             */
+            job_state: "QUEUED";
+        };
+        /** ReviewCandidate */
+        ReviewCandidate: {
+            /**
+             * Po Id
+             * Format: uuid
+             */
+            po_id: string;
+            /** Po Number */
+            po_number: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Status */
+            status: string;
+            /** Remaining Gross */
+            remaining_gross: string | null;
+        };
+        /** ReviewPayload */
+        ReviewPayload: {
+            /** Po Id */
+            po_id?: string | null;
+        };
+        /** ReviewResponse */
+        ReviewResponse: {
+            /** Generation */
+            generation: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "SELECT_PO" | "REJECT" | "REQUEST_INFO";
+            payload: components["schemas"]["ReviewPayload"];
+            /** Reason */
+            reason: string;
+        };
+        /** ReviewView */
+        ReviewView: {
+            /**
+             * Review Request Id
+             * Format: uuid
+             */
+            review_request_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Generation */
+            generation: number;
+            /** Kind */
+            kind: string;
+            /** Question */
+            question: string;
+            /** Options */
+            options: components["schemas"]["ReviewCandidate"][];
+            /** Allowed Actions */
+            allowed_actions: string[];
+            /** Status */
+            status: string;
+        };
         /** RunEventResponse */
         RunEventResponse: {
             /**
@@ -346,6 +458,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunEventResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review_api_v1_runs__run_id__review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_review_api_v1_reviews__review_id__respond_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Idempotency-Key": string;
+            };
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewResponse"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAccepted"];
                 };
             };
             /** @description Validation Error */

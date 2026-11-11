@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     app_api_token: SecretStr
     openai_api_key: SecretStr | None = None
     openai_model: str | None = None
+    reviewer_api_token: SecretStr | None = None
+
+    @field_validator("reviewer_api_token")
+    @classmethod
+    def reviewer_length(cls, value):
+        if value is not None and len(value.get_secret_value()) < 24:
+            raise ValueError("REVIEWER_API_TOKEN must contain at least 24 characters")
+        return value
 
     @field_validator("database_url")
     @classmethod
