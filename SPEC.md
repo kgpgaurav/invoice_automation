@@ -40,7 +40,7 @@ The hiring brief requires a live end-to-end process, a visible execution view, a
 | `invoice_number` | `str \| None` | Printed original; normalized separately |
 | `invoice_date` | `date \| None` | No inferred dates |
 | `po_reference` | `str \| None` | Can be omitted, triggering PO selection |
-| `currency` | `Literal['INR'] \| None` | Other currencies unsupported in MVP => review |
+| `currency` | `str \| None` | Preserve the printed currency; only INR may authorize, others => review |
 | `subtotal_net` | `Decimal \| None` | Pre-tax subtotal when identifiable |
 | `tax_total` | `Decimal \| None` | Total tax when identifiable |
 | `total_gross` | `Decimal \| None` | Amount due; mandatory for auto-approval |
@@ -50,6 +50,8 @@ The hiring brief requires a live end-to-end process, a visible execution view, a
 | `evidence` | `list[FieldEvidenceV1]` | Page/text evidence for critical fields |
 
 `InvoiceLineV1`: `line_no: int`, `sku: str|null`, `description: str`, `quantity: Decimal|null`, `unit_price: Decimal|null`, `net_amount: Decimal|null`, `tax_amount: Decimal|null`, `gross_amount: Decimal|null`. Actual Structured Output schema uses JSON-compatible strings for decimal numbers when needed and validates/converts them through Pydantic. Evidence may be attached per field/line. Define the schema in **one Python module** and derive output format, service validation and OpenAPI contracts from it.
+
+Slice 4 clarification (explicitly requested): unprinted line numbers/descriptions remain nullable at the extraction boundary. Nullable `po_line_no`, `tax_rate` (percent) and `price_basis` (`NET|GROSS|UNKNOWN`) preserve evidence required by the financial contract; they must never be inferred as trusted defaults. Model evidence cannot supply trusted verification flags or bounding boxes. These clarifications preserve financial policy and do not expose a new HTTP endpoint.
 
 ## 1.2 Relational tables (PostgreSQL)
 

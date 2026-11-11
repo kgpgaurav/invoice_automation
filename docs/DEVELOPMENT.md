@@ -1,5 +1,68 @@
 # Development and verification
 
+## Current Slice 4: OpenAI extraction (2026-11-12)
+
+Closure before Slice 5: reviewed all uncommitted extraction sources/tests/migration/report against df517a4. Investigated original clean/alternate UNVERIFIED_TOTAL independently: clean is resolved by narrow bank mask handling; alternate remained broken because get_text(sort=True) merged columns. Local page inspection now preserves geometric lines, retaining exact label/value/page checks. Independent evidence regressions demonstrate both clean and alternate become eligible for the existing financial assessment; no fixture-specific exemption or evidence relaxation. Also reject malformed numeric grouping rather than silently stripping arbitrary commas. Verifier version is labelled-fields-3. Original benchmark findings remain unchanged historical measurements. Full closure regression: 117 passed, one opt-in live skip, existing TestClient warning; Ruff and frontend build passed; migration roundtrip included. Commit Slice 4 separately before ownership/graph changes. Earlier uncommitted statements below are historical.
+
+Slice 3 closure review and regression checks passed before its separate commit **df517a4**. Reviewed allocation locks, Decimal precision, canonical identity, immutable history, replay, migration teardown and transaction rollback against a0ba820; no critical defect was found. All 84 tests passed again, as did Ruff, migration roundtrip/parity, Git whitespace checks and frontend production build. No push occurred. The earlier Slice 3 uncommitted statement below is historical; Slice 4 alone is left uncommitted.
+
+SPEC §§1.1, 3.5–3.6 and 5.2 plus the explicit Slice 4 user requirements govern this work. The only SPEC clarification is preserving printed currencies and nullable missing line fields/rate/basis at the extraction boundary; financial INR-only policy and all approval defaults are unchanged. No HTTP route or UI was added. Production worker code and the financial locking guards are unchanged.
+
+### Exact source changes
+
+- `app/extraction_schema.py`: sole Pydantic InvoiceExtractionV1/line/evidence schema and derived strict JSON output format; all keys required, missing values nullable, decimal values strings, no confidence/verified/bbox/decision fields. Fixed prompt/schema versions. No financial tools are supplied to the model.
+- `app/pdf_input.py`: bounded authentic-PDF intake reuse, local page text, optional pymupdf4llm Markdown, and versioned input paths. Local page text is retained separately for verification; original PDF goes inline base64 on the multimodal route.
+- `app/extraction_client.py`: OpenAI-only HTTPS Responses transport using httpx, configurable explicit model/key, store=false, 45s timeouts, two total attempts shared across transient/schema retries, sanitized refusal/incomplete/provider errors, actual usage/latency recording, and Decimal price estimation. Invalid financial evidence is not a reason for another model call. Model inventory lookup is separate from actual Responses capability verification.
+- `app/evidence_verification.py`: independent labelled-field/value/page association, model-snippet checking, arithmetic/tax/header-line reconciliation and conversion into Slice 3 FinancialDocument. Only local rules create evidence flags. Any unresolved findings clear every financial trusted flag, so using the diagnostic document alone cannot bypass review. Image-only scans remain unverified; no invented bounding boxes. The narrow masked-last-four rule requires a unique exactly matching local four-digit bank value. Version labelled-fields-2 adds that mask handling.
+- `app/extraction_store.py`, model registration in `models.py`, migration `0004_extraction_extraction_api_usage.py`: per-attempt usage ledger with run/document hash, requested/returned model, input/cached/cache-write/output tokens, latency, schema/prompt/path versions, sanitized error and nullable estimated cost/rate provenance. Record callbacks open short transactions after calls, not during calls; attempt replay is idempotent and conflicting replay fails. Prior migrations are unchanged.
+- `app/extraction_evaluation.py`: field-level correctness, missing errors, invented values and incorrect fields; decimal formatting equivalence does not hide wrong values. Evidence quality and schema validity are measured separately from field accuracy.
+- `scripts/extraction_fixtures.py`: six synthetic one-page PDF/expected-data builders, single-column and two-column layouts, missing date/PO, scan, inconsistent total and USD fixture. PDFs/manifest/rendered PNGs are generated privately under `.local/extraction-fixtures` (ignored), not mistaken for real extraction results. All six pages were rendered with PyMuPDF and visually inspected for clipping/legibility.
+- `scripts/benchmark_extraction.py`, `scripts/summarize_extraction_benchmark.py`: explicit --live harness, model lookups, four model/input routes, bounded attempt count and four-hour time ceiling; private resumable per-attempt report and a sanitized published synthetic metric summary. Rates are dated external inputs; cache-write charges are included. No extraction-content caching is implemented or replay hidden.
+- `tests/extraction_helpers.py`, `test_extraction.py`, `test_extraction_safety.py`, `test_extraction_integration.py`, `test_extraction_live.py`: mocked external calls, failures, retries, hostile trust fields, false snippets, scans, precision, costs, usage persistence and explicit fixture-only financial boundary checks. The integration handler asserts zero checked-out database connections during the model call. Live test is opt-in and skips by default.
+- `pyproject.toml` / `uv.lock`: httpx is now a runtime dependency; pymupdf4llm added and locked. `.env.example` names the measured provisional model without any key. No secret was printed or staged.
+- `docs/benchmarks/openai-rates-2026-11-12.json` and `slice4-measured.json`: attributed standard-rate snapshot and actual synthetic-case results. `SPEC.md`, DECISIONS, this file and root PROGRESS.md document the explicit contract clarification, results and integration blockers.
+
+### Reproduce locally
+
+From backend: `uv sync --locked`, `uv run alembic upgrade head` (now **0004_extraction**), and configure OPENAI_API_KEY/OPENAI_MODEL locally in ignored `.env`. Never put the key in chat or a VITE variable. Runtime model remains explicit; .env.example suggests gpt-6-luna based on this mini-set only. All previously documented local API/frontend startup commands remain valid; uploads stay queued.
+
+Routine checks: `uv run pytest -q --tb=short`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run python -m scripts.export_openapi`; frontend `npm.cmd run generate:api` and `npm.cmd run build`. TEST_DATABASE_URL must point to the isolated local PostgreSQL instance as before. Tests never fall back to SQLite or spend on OpenAI by default.
+
+Explicit paid evaluation: `uv run python -m scripts.benchmark_extraction --live --max-calls 28`, then `uv run python -m scripts.summarize_extraction_benchmark`. This sends only the generated synthetic fixture PDFs/text to OpenAI. The benchmark default maximum is 24; the observed matrix used 24 attempts with no retries. `uv run python -m scripts.extraction_fixtures` regenerates the private PDFs, manifest and page PNGs. Preserve the private report before rerunning; this initial harness overwrites its fixed report filename. To run the isolated live test, explicitly set PS1_LIVE_EXTRACTION=1 and OPENAI_MODEL, then run only tests/test_extraction_live.py. No live test calls approval.
+
+### Live results and limits
+
+Account model lookup: Luna and Terra both HTTP 200, followed by successful Responses/strict-schema/PDF requests. Six fixtures per route, 23 scored fields per fixture (including line-count), with expected nulls and numeric equivalence. Core benchmark wall time **286.5s**, well inside the four-hour ceiling.
+
+| Route | Fields correct | Median latency | Total input / output tokens | Estimated USD / 6 PDFs |
+|---|---:|---:|---:|---:|
+| Luna / PyMuPDF text | 115/138 (83.33%) | 10.609s | 6418 / 5898 | 0.00372860 |
+| Luna / pymupdf4llm Markdown | 115/138 (83.33%) | 11.023s | 6398 / 6391 | 0.003972700 |
+| Luna / original PDF | 138/138 (100%) | 11.9845s | 9496 / 7843 | 0.005108050 |
+| Terra / original PDF | 138/138 (100%) | 13.547s | 9496 / 5949 | 0.04161050 |
+
+Both text routes score 100% on the five text-bearing fixtures, but each incurs 22 missing-field errors and one line-count mismatch on the scan. Both PDF routes preserve missing date/PO and unsupported USD, and correctly transcribe the inconsistent 12000 total instead of silently repairing it. Arithmetic verification still holds that case. All 24 responses were schema-valid; schema success did not imply factual correctness on the scan/text path, nor trusted source grounding. Luna/PDF is the provisional extraction choice for this mini-set; this does not prove universal cost/accuracy superiority or full golden-set acceptance. Scans require review despite correct model transcription.
+
+Costs use returned tokens, including cache writes, with the [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) and [Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) published standard rates dated in the rate snapshot. Cache-write rates were added after inspecting returned usage; published costs were recomputed from the original actual token counts, not rerun/model estimates. Account billing receipts are unavailable, so billing_cost stays null. A diagnostic Luna PDF call (1122 input, 1364 output tokens) and isolated live test passed outside the 24-case table; their costs are excluded from the comparative table. The live test validates usage in memory; the diagnostic usage is retained under ignored `.local`.
+
+The benchmark recorded the initial stricter verifier's false holds on clean bank-last4 snippets. Version 2's narrow mask support is regression-tested; the table remains the original measured extraction run, not retrospectively relabelled as approved. Table/complex-layout field association is intentionally conservative and can require review even when values are correct. The full >=20 real-layout gold set, production local evidence verifier and scan corroboration remain blockers.
+
+Future graph integration must retain the worker session lock through the model call with no open transaction, then fence persisted extraction/events by owner+attempt+lease. The current financial service deliberately refuses that worker lock; a future owner-bound finalizer must use the verified owning connection and recheck under row locks. Do not drop the lock guard or bypass the fixture restriction. Production worker, graph, review UI, SSE, payment and email stay disabled/unimplemented. Usage may be uncertain if a process dies between a successful provider call and persistence; nothing claims exactly-once model billing. Optional content-hash caching is deferred.
+
+### Final Slice 4 verification record
+
+| Command/check | Observed result |
+|---|---|
+| Full routine `python -m pytest -q --tb=short` | **114 passed, 1 skipped in 64.42s**; all original 84 tests preserved, 30 additional routine cases; one existing upstream TestClient warning |
+| Explicit PS1_LIVE_EXTRACTION=1 test, Luna/PDF | **1 passed in 12.00s**; no financial service call; upstream warning plus sandbox/user pytest-cache permission warning |
+| `ruff check .` / `ruff format --check .` | Passed; 46 files formatted |
+| All-revision migration upgrade / metadata parity / downgrade / re-upgrade | Passed within full PostgreSQL suite, including 0004 and all financial immutable triggers |
+| OpenAPI export + generated API types | Passed; zero public-contract diff against df517a4 |
+| Frontend TypeScript/Vite production build | Passed; 28 modules |
+| Git whitespace / ignored-secret checks | Passed; local .env remains ignored, no remote push |
+
+The local key was absent initially; the user configured it without sharing it in chat. Both account model lookups and actual Responses requests then succeeded. The initially empty local OPENAI_MODEL was set to gpt-6-luna after measurement; existing nonempty user values were not overwritten. No key was printed, copied into source or committed. The first extraction-focused run passed 26 tests, then safety/cost additions were included in the final 114-test run. Initial Ruff formatting issues were corrected before final validation. No live provider errors or malformed schemas occurred in the 24-call matrix; those failure paths are covered by mocked tests. Core measured results precede the narrow masked-bank verifier refinement and remain labelled accordingly. The project-only PostgreSQL instance was stopped after verification; Slice 4 changes remain uncommitted for review.
+
 ## Current Slice 3: deterministic financial foundation (2026-11-12)
 
 Closure for Slice 4: reviewed all financial source, migration, fixtures/tests and the diff against a0ba820, focusing on locked allocation, identity, precision, replay and atomic rollback. No critical defect found. Re-ran all 84 tests (56.42s, one existing upstream warning), migration roundtrip/parity, Ruff check/format and frontend production build; all passed. Git whitespace check passed. Slice 3 is committed separately before extraction work; earlier uncommitted statements below are historical.

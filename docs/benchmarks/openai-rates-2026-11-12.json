@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-12",
+  "currency": "USD",
+  "unit": "per million tokens, standard text rates; estimate, not account billing",
+  "models": {
+    "gpt-6-luna": {
+      "input": "0.10", "cached": "0.01", "cache_write": "0.125", "output": "0.50",
+      "source": "https://developers.openai.com/api/docs/models/gpt-6-luna"
+    },
+    "gpt-6.1-terra": {
+      "input": "1.00", "cached": "0.05", "cache_write": "1.25", "output": "5.00",
+      "source": "https://developers.openai.com/api/docs/models/gpt-6.1-terra"
+    }
+  }
+}
