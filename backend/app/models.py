@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app import financial_models  # noqa: F401
 from app.db import Base
 
 

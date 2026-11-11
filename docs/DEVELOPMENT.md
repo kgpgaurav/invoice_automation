@@ -1,6 +1,54 @@
 # Development and verification
 
-## Current Slice 2: worker infrastructure (2026-11-11)
+## Current Slice 3: deterministic financial foundation (2026-11-12)
+
+Closure for Slice 4: reviewed all financial source, migration, fixtures/tests and the diff against a0ba820, focusing on locked allocation, identity, precision, replay and atomic rollback. No critical defect found. Re-ran all 84 tests (56.42s, one existing upstream warning), migration roundtrip/parity, Ruff check/format and frontend production build; all passed. Git whitespace check passed. Slice 3 is committed separately before extraction work; earlier uncommitted statements below are historical.
+
+Slice 2 was reviewed against 97757cf, passed all 32 regression tests, Ruff, Git checks and frontend build, and was committed separately as **a0ba820**. No critical ownership/transaction/migration/idempotency defect was found. No remote push occurred. All Slice 3 work remains uncommitted for review.
+
+Financial contracts and fixture calculations were recorded before implementation in [DECISIONS.md](DECISIONS.md), under SPEC §§1.1–1.3, 2.1–2.3 and 5.1–5.2. No SPEC policy defaults or public API contracts changed. Original source fields/evidence are kept alongside normalized identity keys; unsupported currency is preserved and reviewed.
+
+Files added:
+
+- `backend/app/finance_contracts.py`: frozen internal verified-document/evidence/line contracts, vendor/PO enums, bounded Decimal types, conservative invoice/tax/name normalization and separate price/rounding cap helpers. Floats, nonfinite numbers, negative money, zero quantities and excess source precision fail validation. INR totals use two decimals; unit price four, quantity six, rate six. Decimal arithmetic uses an isolated 48-digit context during evaluation/posting and ROUND_HALF_UP line computation.
+- `backend/app/financial_models.py`: vendors, POs, PO lines, immutable policies, canonical approved invoices, ledger, quantity allocations and private assessment snapshots. Foreign keys, vendor/key uniqueness, unique invoice/run approvals, PO cap/quantity checks, INR checks and state constraints are present. Assessment revisions preserve a future path to append authorized review decisions on the same run; the foundation writes revision 0 only.
+- `backend/alembic/versions/0003_finance_financial_domain_foundation.py`: frozen explicit schema DDL, indexes and immutable-history triggers. UPDATE/DELETE of policies, invoices, assessments, ledger and allocations are rejected. Migration 0001/0002 remain unchanged. No policy or financial fixture is automatically seeded in application databases. Database committed gross/quantity defaults are zero.
+- `backend/app/finance_rules.py`: pure vendor/PO/line matching and deterministic evidence, currency, bank, date, tax, arithmetic, price, available gross and aggregate quantity checks. Missing PO cannot auto-match even with one candidate. Conflicting explicit line/SKU identifiers cannot fall back to fuzzy descriptions. Net and inclusive-gross prices reconcile against explicit tax rates and approved net PO prices.
+- `backend/app/approval.py`: explicit policy registration and internal `approve(engine, run_id, document, policy_version)`. Only labelled `fixture:` runs are accepted in this slice. No HTTP endpoint calls the service. Same-run identical replay returns its stored immutable result; changed data/policy conflicts. Only PostgreSQL deadlock/serialization failures retry (three attempts maximum). Matching keys serialize per vendor/invoice; vendor, PO and ordered PO lines are reread under row locks. Ledger/allocation sums must agree with PO counters or the invoice is held. Ledger, allocations, counters, assessment, run result and event commit in one short transaction. A worker-owned run is refused.
+- `backend/tests/financial_fixtures.py`, `test_finance_rules.py`, `test_approval.py`, `test_approval_boundaries.py`: synthetic deterministic master/document builders and pure/PostgreSQL tests. Each test resets via its isolated schema. H1 and E1–E4 exercise explicit calculations from DECISIONS; no extraction/PDF accuracy is implied.
+
+Existing files changed: `models.py` registers the financial mappings; `events.py` accepts an optional explicit stage while retaining WORKER as its default and preserving event deduplication; DECISIONS/DEVELOPMENT record contracts and results. The API implementation, worker implementation, frontend source, dependencies and prior migrations remain unchanged. OpenAPI/type regeneration must yield no diff for this slice.
+
+### Transaction and safety invariants
+
+Approval takes the same run advisory-lock namespace as the worker, then run/vendor/identity/PO/line locks. Re-read validations use database UTC date and current master state; stale preflight information cannot authorize posting. Unique canonical identity and unique invoice/run ledger constraints backstop the service. No financial use of float or model judgment exists. Gross cap and aggregate accepted quantities are checked before posting, with database over-commit checks as a further guard. Waiting/held cases allocate nothing. A failed transaction leaves no partial invoice, ledger, allocation, counter, assessment, event or run decision. Replaying a committed approval adds no second event or allocation. No paid state or payment execution exists.
+
+An internal NEEDS_REVIEW assessment remains provisional: its run is INTERRUPTED with a null public decision until a real review request and graph interrupt exist. Approved/rejected fixture results are real deterministic database decisions tested only in isolated schemas; no demonstration approval is seeded or exposed through an application endpoint. Production worker processing remains disabled. Existing intake uploads remain queued unless a direct internal caller explicitly assesses a fixture run.
+
+### Limits and remaining blockers
+
+H2 is **not** an approved fixture. The exact 49998 + 0 tax → printed 50000 discrepancy is reviewed because a ₹2 difference and passing numeric caps do not prove a legitimate rounding convention. The rounding-cap helper is necessary-condition arithmetic only. A verified source convention is still needed before implementing an aggregate rounding waiver. Four synthetic rule/ledger edge cases are covered; scanned-document extraction, real PDF gold fixtures, real evidence verification, full GST/jurisdiction compliance and credit notes are not implemented.
+
+Review corrections/resume are not implemented; a future authorized review writer can append an assessment revision, never mutate historical evidence or approve twice. No human-review UI, OpenAI, LangGraph, SSE, email, export or payment integration was added. Production checkpoint/ledger reconciliation and worker fencing integration remain activation prerequisites. The direct financial service is intentionally unavailable for ordinary uploads; the `fixture:` restriction is an internal development guard, not a deployed authentication mechanism. Database roles/master-data authorization and hosting remain future deployment work.
+
+### Slice 3 verification
+
+Commands run from backend use `.venv/Scripts/python.exe` / `ruff.exe`, equivalent to `uv run`. Tests use `TEST_DATABASE_URL=postgresql+psycopg://ps1@127.0.0.1:55432/postgres` and random isolated real PostgreSQL schemas. The existing migration roundtrip test covers all revisions: upgrade, metadata parity, downgrade to base, upgrade again. The lock-wait test observes an actual PO FOR UPDATE attempt before allowing a concurrent closure to commit.
+
+Intermediate results: migration checks passed 4/4; first focused financial run had 23 failures and 20 passes, all failures caused by the zero-overrun Decimal literal rejecting its serialized string. Replaced that literal with an equivalent Decimal range fixed at zero; the focused suite then passed 43/43. Further duplicate-history/lock/quantity boundary coverage brought the full suite to 84 passing tests before the final assessment-revision/default refinement. Final results are recorded below after rerun. Initial formatting/import findings were corrected; no failures are hidden.
+
+| Final check | Observed result |
+|---|---|
+| `python -m pytest -q --tb=short` | **84 passed in 60.59s**; includes all 32 prior regressions and 52 financial cases; one existing upstream TestClient deprecation warning |
+| `ruff check .` / `ruff format --check .` | Passed; 31 Python files formatted |
+| Migration upgrade → metadata comparison → downgrade to base → upgrade | Passed in the full suite, including immutable trigger/function teardown and revision 0003 |
+| `python -m scripts.export_openapi` / `npm.cmd run generate:api` | Passed; generated JSON/types have zero diff against Slice 2 |
+| `npm.cmd run build` | TypeScript + Vite production build passed; 28 modules |
+| `git diff --check` | Passed; informational Windows line-ending notices only |
+
+For local schema installation use the existing backend setup and `uv run alembic upgrade head` (head now **0003_finance**). The API readiness check requires this head. No financial policy/master data is installed automatically. Financial tests are the executable fixture setup/reset mechanism for this foundation; do not use tests or synthetic builders against production. No separate financial HTTP smoke endpoint or UI has been introduced. The project-only PostgreSQL test instance was stopped after verification. No remote push occurred; only Slice 2 is committed, and Slice 3 remains reviewable as uncommitted changes.
+
+## Slice 2 historical record: worker infrastructure (2026-11-11)
 
 Closure review 2026-11-12: reviewed the complete Slice 2 tracked diff against 97757cf plus all new worker/migration/test files. Ownership uses a dedicated connection that is invalidated (physically closed) on release; lease recovery cannot take a live session lock; owner/attempt/deadline fence mutations; claims, retries and events commit together; failure rolls back the claim and releases its lock; exhaustion never creates a financial decision. Migration down/up and event deduplication are covered by regression tests. No critical defect was found. Full regression: 32 passed in 31.34s, one existing TestClient warning; Ruff check/format and frontend production build passed. Git diff whitespace check passed and no remote exists. Slice 2 is committed separately before financial work; the earlier uncommitted statement below is historical.
 
