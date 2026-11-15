@@ -303,16 +303,10 @@ def main():
             return 0
         if not args.policy_version:
             parser.error("--policy-version must name an already registered policy")
-        from app.extraction_client import OpenAIExtractor
-        from app.workflow import WorkflowProcessor
+        from app.provider_credentials import configured_processor, run_configured_worker
 
         settings = Settings()
-        extractor = OpenAIExtractor(
-            settings.openai_api_key.get_secret_value() if settings.openai_api_key else None,
-            settings.openai_model,
-        )
-        try:
-            processor = WorkflowProcessor(engine, extractor, args.policy_version)
+        with configured_processor(engine, settings, args.policy_version) as processor:
             processor.check_ready()
             worker = Worker(engine, processor)
             if args.once:
@@ -323,9 +317,7 @@ def main():
                 stop = Event()
                 signal.signal(signal.SIGINT, lambda *_: stop.set())
                 signal.signal(signal.SIGTERM, lambda *_: stop.set())
-                worker.run(stop)
-        finally:
-            extractor.close()
+                run_configured_worker(worker, stop)
         return 0
     finally:
         engine.dispose()

@@ -7,7 +7,7 @@
 
 ## Mission and scope
 - Implement a **real**, live, testable invoice-PDF-to-decision workflow for the PS-1 case study, with a clean upload UI, stage-by-stage run timeline, dashboard/history, readable decision reasons, and meaningful exception handling.
-- Use only OpenAI as the AI provider. One application API key; do not require other LLM providers. Do not claim any selected model is the cheapest or most accurate until measured on fixtures.
+- Use only OpenAI as the AI provider. The default uses one application API key; the explicitly requested reviewer-key mode follows SPEC §3.5. Do not require other LLM providers. Do not claim any selected model is the cheapest or most accurate until measured on fixtures.
 - Use FastAPI, Pydantic, PostgreSQL/SQLAlchemy, LangGraph with durable checkpoints and human-review interrupts, React/TypeScript, and deterministic Python business rules, as scoped by `SPEC.md`.
 - The LLM extracts document fields; it never determines final financial authorization. Never execute real payments or automatically send vendor emails.
 
@@ -18,7 +18,8 @@
 - Prevent duplicate approvals atomically. Recheck PO balance with row locking in the same transaction as the invoice ledger/approval update.
 - Keep the `interrupt()` call in a side-effect-free review node; after resume, re-evaluate current financial data. Checkpoint IDs/thread IDs must be stable.
 - Run creation, retries, replay, and crash recovery must be idempotent. Clearly label fixture or replayed LLM data; never masquerade it as a fresh live model call.
-- Secrets must stay in environment variables or ignored `.env` files. Never commit API keys, invoice banking secrets, or production credentials.
+- In explicit role mode, derive permissions/ownership from individual server-authenticated credentials. Submitters can read only their own runs/documents/events/provider sessions; finance/review features are reviewer-only. Hide unavailable screens and enforce API checks. Never guess or backfill ownership of legacy records; shared compatibility mode is not person-level isolation.
+- Operator secrets must stay in environment variables or ignored `.env` files. The explicitly authorized reviewer-key exception uses only authenticated-encrypted, expiring server storage as specified in SPEC §3.5; never persist plaintext keys. Never commit API keys, invoice banking secrets, or production credentials.
 
 ## Working protocol
 1. At the beginning of each task, identify the precise spec section and summarize expected file edits and acceptance tests.

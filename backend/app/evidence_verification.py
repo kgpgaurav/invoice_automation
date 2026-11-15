@@ -157,6 +157,10 @@ def verify(extraction: InvoiceExtractionV1, pdf: bytes) -> Verification:
                     field=path, page=grounded[0], raw_text=grounded[1], method="TEXT", verified=True
                 )
             )
+    # Optional means absent from the source, not permission for the model to drop
+    # a printed identifier and bypass bank, identity, PO or line matching checks.
+    if any(path not in fields for path in records):
+        findings.append("PRINTED_FIELD_OMITTED")
     if not any(p.strip() for p in local.pages):
         findings.append("SCANNED_EVIDENCE_REQUIRES_REVIEW")
     if data["currency"] != "INR":

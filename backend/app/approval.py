@@ -132,7 +132,7 @@ def assess_transaction(
         raise ApprovalConflict("Register an immutable policy version before assessment")
     policy = FinancialPolicy.model_validate(policy_row.config_json)
     result = forced_result or critical_check(document)
-    allocations, vendor, po = {}, None, None
+    allocations, vendor, po, observations = {}, None, None, None
     if result is None:
         vendors = session.scalars(select(Vendor)).all()
         orders = session.scalars(select(PurchaseOrder)).all()
@@ -234,6 +234,21 @@ def assess_transaction(
             else:
                 today = session.scalar(text("SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date"))
                 result, allocations = evaluate(document, vendor, po, lines, policy, today)
+                observations = {
+                    "vendor_id": str(vendor.id),
+                    "po_id": str(po.id),
+                    "po_number": po.po_number,
+                    "currency": po.currency,
+                    "cap_gross": str(po.approved_cap_gross),
+                    "committed_gross": str(committed),
+                    "remaining_gross": str(po.approved_cap_gross - committed),
+                    "requested_gross": str(document.total_gross),
+                    "excess_gross": str(
+                        max(
+                            Decimal("0"), document.total_gross - (po.approved_cap_gross - committed)
+                        )
+                    ),
+                }
     if not post:
         return result
     if result.decision == "APPROVED":
@@ -281,6 +296,7 @@ def assess_transaction(
             decision=result.decision,
             code=result.code,
             reason=result.reason,
+            observations_json=observations,
         )
     )
     run.policy_version = policy_version

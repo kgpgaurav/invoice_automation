@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/api/v1/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Access */
+        get: operations["get_access_api_v1_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/openai/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Provider Config */
+        get: operations["provider_config_api_v1_openai_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/openai/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect Provider */
+        post: operations["connect_provider_api_v1_openai_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/openai/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect Provider */
+        delete: operations["disconnect_provider_api_v1_openai_session_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -123,16 +191,218 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get History */
+        get: operations["get_history_api_v1_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Purchase Orders */
+        get: operations["get_purchase_orders_api_v1_purchase_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchase-orders/{po_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Purchase Order */
+        get: operations["get_purchase_order_api_v1_purchase_orders__po_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard */
+        get: operations["get_dashboard_api_v1_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: operations["get_document_api_v1_runs__run_id__document_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stream */
+        get: operations["get_stream_api_v1_runs__run_id__events_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccessView */
+        AccessView: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "shared" | "roles";
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "workspace" | "submitter" | "reviewer";
+            /** Actor Id */
+            actor_id: string;
+            /** Pages */
+            pages: string[];
+        };
         /** Body_process_invoice_api_v1_invoices_process_post */
         Body_process_invoice_api_v1_invoices_process_post: {
             /** File */
             file: string;
             /** Source */
             source?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+        };
+        /** DashboardSummary */
+        DashboardSummary: {
+            /** Total Runs */
+            total_runs: number;
+            /** Total Processed */
+            total_processed: number;
+            /** Approved */
+            approved: number;
+            /** Rejected */
+            rejected: number;
+            /** Awaiting Review */
+            awaiting_review: number;
+            /** Active */
+            active: number;
+            /** Failed */
+            failed: number;
+            /** Average Processing Ms */
+            average_processing_ms: number | null;
+            /** Processing Time Sample Count */
+            processing_time_sample_count: number;
+            /** Estimated Api Cost Usd */
+            estimated_api_cost_usd: string | null;
+            /** Estimated Cost Known Runs */
+            estimated_cost_known_runs: number;
+            /** Estimated Cost Unknown Runs */
+            estimated_cost_unknown_runs: number;
+            /** Actual Billed Cost Usd */
+            actual_billed_cost_usd?: null;
+            /** Potential Po Overrun Inr */
+            potential_po_overrun_inr: string | null;
+            /** Overrun Known Identities */
+            overrun_known_identities: number;
+            /** Overrun Unknown Identities */
+            overrun_unknown_identities: number;
+            /**
+             * Straight Through Approved
+             * @default 0
+             */
+            straight_through_approved: number;
+            /**
+             * Automation Eligible Runs
+             * @default 0
+             */
+            automation_eligible_runs: number;
+            /** Straight Through Rate Pct */
+            straight_through_rate_pct?: string | null;
+            /**
+             * Mock Runs
+             * @default 0
+             */
+            mock_runs: number;
+            /**
+             * Live Runs
+             * @default 0
+             */
+            live_runs: number;
+            /**
+             * Replay Runs
+             * @default 0
+             */
+            replay_runs: number;
+            /**
+             * Metrics Notice
+             * @default All runs. Processed means final approved/rejected decisions. Time excludes queue/review wait; incomplete intervals are excluded. Overrun is recorded potential exposure for distinct current holds, not savings.
+             */
+            metrics_notice: string;
+        };
+        /** ExtractedField */
+        ExtractedField: {
+            /** Field */
+            field: string;
+            /** Value */
+            value: string | null;
+            /**
+             * Verification
+             * @enum {string}
+             */
+            verification: "verified" | "unverified" | "missing";
+            /** Pages */
+            pages: number[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -172,6 +442,168 @@ export interface components {
          * @enum {string}
          */
         JobState: "QUEUED" | "RUNNING" | "WAITING_REVIEW" | "COMPLETED" | "FAILED" | "INTERRUPTED";
+        /** LedgerEntryView */
+        LedgerEntryView: {
+            /**
+             * Ledger Id
+             * Format: uuid
+             */
+            ledger_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Invoice Date */
+            invoice_date: string;
+            /** Gross */
+            gross: string;
+            /**
+             * Approved At
+             * Format: date-time
+             */
+            approved_at: string;
+        };
+        /** PODirectoryEntry */
+        PODirectoryEntry: {
+            /**
+             * Po Id
+             * Format: uuid
+             */
+            po_id: string;
+            /** Po Number */
+            po_number: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Status */
+            status: string;
+            /** Currency */
+            currency: string;
+            /** Cap Gross */
+            cap_gross: string;
+            /** Committed Gross */
+            committed_gross: string;
+        };
+        /** POLedgerView */
+        POLedgerView: {
+            /**
+             * Po Id
+             * Format: uuid
+             */
+            po_id: string;
+            /** Po Number */
+            po_number: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Status */
+            status: string;
+            /** Currency */
+            currency: string;
+            /** Cap Gross */
+            cap_gross: string;
+            /** Committed Gross */
+            committed_gross: string;
+            /** Issued At */
+            issued_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Ledger Committed Gross */
+            ledger_committed_gross: string;
+            /** Available Gross */
+            available_gross: string | null;
+            /** Balance Reconciled */
+            balance_reconciled: boolean;
+            /** Allocations */
+            allocations: components["schemas"]["LedgerEntryView"][];
+            /** Allocation Count */
+            allocation_count: number;
+            /** Allocations Truncated */
+            allocations_truncated: boolean;
+        };
+        /** POPage */
+        POPage: {
+            /** Items */
+            items: components["schemas"]["PODirectoryEntry"][];
+            /** Next After */
+            next_after: string | null;
+            /** Total Count */
+            total_count: number;
+        };
+        /** POView */
+        POView: {
+            /**
+             * Po Id
+             * Format: uuid
+             */
+            po_id: string;
+            /** Po Number */
+            po_number: string;
+            /** Status */
+            status: string;
+            /** Currency */
+            currency: string;
+            /** Cap Gross */
+            cap_gross: string;
+            /** Committed Gross */
+            committed_gross: string;
+            /** Remaining Gross */
+            remaining_gross: string;
+            /**
+             * Relationship
+             * @enum {string}
+             */
+            relationship: "APPROVED_ALLOCATION" | "ASSESSED_PO" | "PRINTED_REFERENCE";
+            /**
+             * Balance Label
+             * @default Current PO balance; other approvals may have changed it
+             */
+            balance_label: string;
+        };
+        /** ProcessingFailureView */
+        ProcessingFailureView: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "MOCK_FIXTURE_NOT_FOUND" | "BYOK_CREDENTIALS_UNAVAILABLE";
+            /** Message */
+            message: string;
+            /** Next Action */
+            next_action: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "PERSISTED_EXTRACTION_ERROR" | "RECORDED_MOCK_HTTP_422";
+        };
+        /** ProviderConfig */
+        ProviderConfig: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "server" | "reviewer";
+            /** Supported Models */
+            supported_models: string[];
+            /** Max Pdf Bytes */
+            max_pdf_bytes: number;
+            /** Max Pdf Pages */
+            max_pdf_pages: number;
+        };
+        /** ProviderConnection */
+        ProviderConnection: {
+            /** Session Token */
+            session_token: string;
+            /** Models */
+            models: string[];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** ReviewAccepted */
         ReviewAccepted: {
             /**
@@ -250,31 +682,33 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** RunEventResponse */
-        RunEventResponse: {
+        /** RuleCheckView */
+        RuleCheckView: {
+            /** Rule Id */
+            rule_id: string;
+            /** Title */
+            title: string;
             /**
-             * Run Id
-             * Format: uuid
+             * Status
+             * @enum {string}
              */
-            run_id: string;
-            /** Seq */
-            seq: number;
-            /** Type */
-            type: string;
-            /** Stage */
-            stage: string;
+            status: "passed" | "failed" | "requires_review" | "not_evaluated";
+            /** Description */
+            description: string;
+            /** Provenance */
+            provenance: string;
+            /** Finding Code */
+            finding_code?: string | null;
+            /** Assessment Revision */
+            assessment_revision?: number | null;
             /**
-             * Occurred At
-             * Format: date-time
+             * Pages
+             * @default []
              */
-            occurred_at: string;
-            /** Payload */
-            payload: {
-                [key: string]: unknown;
-            };
+            pages: number[];
         };
-        /** RunStatus */
-        RunStatus: {
+        /** RunDetail */
+        RunDetail: {
             /**
              * Run Id
              * Format: uuid
@@ -299,6 +733,222 @@ export interface components {
             replay_mode: boolean;
             /** Implementation Notice */
             implementation_notice: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Source Mode */
+            source_mode: string;
+            /** Policy Version */
+            policy_version: string;
+            /** Model Id */
+            model_id: string;
+            /** Reason Code */
+            reason_code: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Invoice Number */
+            invoice_number: string | null;
+            /** Invoice Currency */
+            invoice_currency: string | null;
+            /** Invoice Total */
+            invoice_total: string | null;
+            /** Fields */
+            fields: components["schemas"]["ExtractedField"][];
+            /** Verification Findings */
+            verification_findings: string[];
+            vendor: components["schemas"]["VendorView"] | null;
+            purchase_order: components["schemas"]["POView"] | null;
+            /** Decision Observations */
+            decision_observations: {
+                [key: string]: string;
+            } | null;
+            /** Approved Gross */
+            approved_gross: string | null;
+            /** Review Request Id */
+            review_request_id: string | null;
+            /** Stages */
+            stages: components["schemas"]["StageView"][];
+            /** Processing Ms */
+            processing_ms: number | null;
+            /**
+             * Processing Time Status
+             * @enum {string}
+             */
+            processing_time_status: "measured" | "incomplete" | "pending";
+            usage: components["schemas"]["UsageView"];
+            /**
+             * Checks
+             * @default []
+             */
+            checks: components["schemas"]["RuleCheckView"][];
+            /** Business Explanation */
+            business_explanation?: string | null;
+            processing_failure?: components["schemas"]["ProcessingFailureView"] | null;
+        };
+        /** RunEventResponse */
+        RunEventResponse: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Seq */
+            seq: number;
+            /** Type */
+            type: string;
+            /** Stage */
+            stage: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
+        /** RunPage */
+        RunPage: {
+            /** Items */
+            items: components["schemas"]["RunSummary"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total Count */
+            total_count: number;
+        };
+        /** RunSummary */
+        RunSummary: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            job_state: components["schemas"]["JobState"];
+            /** Decision */
+            decision: ("APPROVED" | "NEEDS_REVIEW" | "REJECTED") | null;
+            /** Invoice Number */
+            invoice_number: string | null;
+            /** Vendor Name */
+            vendor_name: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Total Gross */
+            total_gross: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Source Mode */
+            source_mode: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Estimated Api Cost Usd */
+            estimated_api_cost_usd?: string | null;
+            processing_failure?: components["schemas"]["ProcessingFailureView"] | null;
+        };
+        /** StageView */
+        StageView: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Operation */
+            operation: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "finished" | "failed";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Elapsed Ms */
+            elapsed_ms: number | null;
+        };
+        /** SubmitterRunDetail */
+        SubmitterRunDetail: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            job_state: components["schemas"]["JobState"];
+            /** Decision */
+            decision: ("APPROVED" | "NEEDS_REVIEW" | "REJECTED") | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Source Mode */
+            source_mode: string;
+            /** Model Id */
+            model_id: string;
+            /** Invoice Number */
+            invoice_number: string | null;
+            /** Invoice Currency */
+            invoice_currency: string | null;
+            /** Invoice Total */
+            invoice_total: string | null;
+            /** Fields */
+            fields: components["schemas"]["ExtractedField"][];
+            /** Stages */
+            stages: components["schemas"]["StageView"][];
+            /** Processing Ms */
+            processing_ms: number | null;
+            usage: components["schemas"]["UsageView"];
+            processing_failure: components["schemas"]["ProcessingFailureView"] | null;
+        };
+        /** UsageView */
+        UsageView: {
+            /**
+             * Recorded Attempts
+             * @default 0
+             */
+            recorded_attempts: number;
+            /**
+             * Reserved Attempts
+             * @default 0
+             */
+            reserved_attempts: number;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: string | null;
+            /** Actual Billed Cost Usd */
+            actual_billed_cost_usd?: null;
+            /**
+             * Cost Status
+             * @default unknown
+             * @enum {string}
+             */
+            cost_status: "estimated" | "unknown" | "not_applicable";
+            /**
+             * Rate Sources
+             * @default []
+             */
+            rate_sources: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -313,6 +963,18 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** VendorView */
+        VendorView: {
+            /**
+             * Vendor Id
+             * Format: uuid
+             */
+            vendor_id: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -322,6 +984,105 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_access_api_v1_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessView"];
+                };
+            };
+        };
+    };
+    provider_config_api_v1_openai_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfig"];
+                };
+            };
+        };
+    };
+    connect_provider_api_v1_openai_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Api Key
+                     * Format: password
+                     */
+                    api_key: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConnection"];
+                };
+            };
+        };
+    };
+    disconnect_provider_api_v1_openai_session_delete: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-OpenAI-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     healthz_api_v1_healthz_get: {
         parameters: {
             query?: never;
@@ -375,6 +1136,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                "X-OpenAI-Session"?: string | null;
                 "X-Idempotency-Key"?: string | null;
             };
             path?: never;
@@ -423,7 +1185,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunStatus"];
+                    "application/json": components["schemas"]["RunDetail"] | components["schemas"]["SubmitterRunDetail"];
                 };
             };
             /** @description Validation Error */
@@ -526,6 +1288,191 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_history_api_v1_runs_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["JobState"] | null;
+                decision?: ("APPROVED" | "NEEDS_REVIEW" | "REJECTED") | null;
+                cursor?: string | null;
+                limit?: number;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_purchase_orders_api_v1_purchase_orders_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["POPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_purchase_order_api_v1_purchase_orders__po_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                po_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["POLedgerView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_v1_dashboard_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+        };
+    };
+    get_document_api_v1_runs__run_id__document_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stream_api_v1_runs__run_id__events_stream_get: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+            };
+            header?: {
+                "last-event-id"?: number | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */

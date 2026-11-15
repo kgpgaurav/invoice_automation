@@ -5,6 +5,133 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/access": {
+      "get": {
+        "summary": "Get Access",
+        "operationId": "get_access_api_v1_access_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openai/config": {
+      "get": {
+        "summary": "Provider Config",
+        "operationId": "provider_config_api_v1_openai_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/openai/sessions": {
+      "post": {
+        "summary": "Connect Provider",
+        "operationId": "connect_provider_api_v1_openai_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "format": "password",
+                    "title": "Api Key",
+                    "writeOnly": true
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "api_key"
+                ],
+                "title": "ProviderInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConnection"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openai/session": {
+      "delete": {
+        "summary": "Disconnect Provider",
+        "operationId": "disconnect_provider_api_v1_openai_session_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-OpenAI-Session",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "X-Openai-Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/healthz": {
       "get": {
         "summary": "Healthz",
@@ -61,6 +188,23 @@
           }
         ],
         "parameters": [
+          {
+            "name": "X-OpenAI-Session",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Openai-Session"
+            }
+          },
           {
             "name": "X-Idempotency-Key",
             "in": "header",
@@ -141,7 +285,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunStatus"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RunDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SubmitterRunDetail"
+                    }
+                  ],
+                  "title": "Response Get Run Api V1 Runs  Run Id  Get"
                 }
               }
             }
@@ -341,10 +493,424 @@
           }
         }
       }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "summary": "Get History",
+        "operationId": "get_history_api_v1_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "APPROVED",
+                    "NEEDS_REVIEW",
+                    "REJECTED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders": {
+      "get": {
+        "summary": "Get Purchase Orders",
+        "operationId": "get_purchase_orders_api_v1_purchase_orders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/{po_id}": {
+      "get": {
+        "summary": "Get Purchase Order",
+        "operationId": "get_purchase_order_api_v1_purchase_orders__po_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "po_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Po Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POLedgerView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "summary": "Get Dashboard",
+        "operationId": "get_dashboard_api_v1_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/document": {
+      "get": {
+        "summary": "Get Document",
+        "operationId": "get_document_api_v1_runs__run_id__document_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/events/stream": {
+      "get": {
+        "summary": "Get Stream",
+        "operationId": "get_stream_api_v1_runs__run_id__events_stream_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "after_seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "After Seq"
+            }
+          },
+          {
+            "name": "last-event-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccessView": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "roles"
+            ],
+            "title": "Mode"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "workspace",
+              "submitter",
+              "reviewer"
+            ],
+            "title": "Role"
+          },
+          "actor_id": {
+            "type": "string",
+            "title": "Actor Id"
+          },
+          "pages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "role",
+          "actor_id",
+          "pages"
+        ],
+        "title": "AccessView"
+      },
       "Body_process_invoice_api_v1_invoices_process_post": {
         "properties": {
           "file": {
@@ -363,6 +929,18 @@
               }
             ],
             "title": "Source"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
           }
         },
         "type": "object",
@@ -370,6 +948,198 @@
           "file"
         ],
         "title": "Body_process_invoice_api_v1_invoices_process_post"
+      },
+      "DashboardSummary": {
+        "properties": {
+          "total_runs": {
+            "type": "integer",
+            "title": "Total Runs"
+          },
+          "total_processed": {
+            "type": "integer",
+            "title": "Total Processed"
+          },
+          "approved": {
+            "type": "integer",
+            "title": "Approved"
+          },
+          "rejected": {
+            "type": "integer",
+            "title": "Rejected"
+          },
+          "awaiting_review": {
+            "type": "integer",
+            "title": "Awaiting Review"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "average_processing_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Processing Ms"
+          },
+          "processing_time_sample_count": {
+            "type": "integer",
+            "title": "Processing Time Sample Count"
+          },
+          "estimated_api_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Api Cost Usd"
+          },
+          "estimated_cost_known_runs": {
+            "type": "integer",
+            "title": "Estimated Cost Known Runs"
+          },
+          "estimated_cost_unknown_runs": {
+            "type": "integer",
+            "title": "Estimated Cost Unknown Runs"
+          },
+          "actual_billed_cost_usd": {
+            "type": "null",
+            "title": "Actual Billed Cost Usd"
+          },
+          "potential_po_overrun_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potential Po Overrun Inr"
+          },
+          "overrun_known_identities": {
+            "type": "integer",
+            "title": "Overrun Known Identities"
+          },
+          "overrun_unknown_identities": {
+            "type": "integer",
+            "title": "Overrun Unknown Identities"
+          },
+          "straight_through_approved": {
+            "type": "integer",
+            "title": "Straight Through Approved",
+            "default": 0
+          },
+          "automation_eligible_runs": {
+            "type": "integer",
+            "title": "Automation Eligible Runs",
+            "default": 0
+          },
+          "straight_through_rate_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Straight Through Rate Pct"
+          },
+          "mock_runs": {
+            "type": "integer",
+            "title": "Mock Runs",
+            "default": 0
+          },
+          "live_runs": {
+            "type": "integer",
+            "title": "Live Runs",
+            "default": 0
+          },
+          "replay_runs": {
+            "type": "integer",
+            "title": "Replay Runs",
+            "default": 0
+          },
+          "metrics_notice": {
+            "type": "string",
+            "title": "Metrics Notice",
+            "default": "All runs. Processed means final approved/rejected decisions. Time excludes queue/review wait; incomplete intervals are excluded. Overrun is recorded potential exposure for distinct current holds, not savings."
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_runs",
+          "total_processed",
+          "approved",
+          "rejected",
+          "awaiting_review",
+          "active",
+          "failed",
+          "average_processing_ms",
+          "processing_time_sample_count",
+          "estimated_api_cost_usd",
+          "estimated_cost_known_runs",
+          "estimated_cost_unknown_runs",
+          "potential_po_overrun_inr",
+          "overrun_known_identities",
+          "overrun_unknown_identities"
+        ],
+        "title": "DashboardSummary"
+      },
+      "ExtractedField": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "missing"
+            ],
+            "title": "Verification"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "value",
+          "verification",
+          "pages"
+        ],
+        "title": "ExtractedField"
       },
       "HTTPValidationError": {
         "properties": {
@@ -456,6 +1226,382 @@
           "INTERRUPTED"
         ],
         "title": "JobState"
+      },
+      "LedgerEntryView": {
+        "properties": {
+          "ledger_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ledger Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "invoice_number": {
+            "type": "string",
+            "title": "Invoice Number"
+          },
+          "invoice_date": {
+            "type": "string",
+            "title": "Invoice Date"
+          },
+          "gross": {
+            "type": "string",
+            "title": "Gross"
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Approved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ledger_id",
+          "run_id",
+          "invoice_number",
+          "invoice_date",
+          "gross",
+          "approved_at"
+        ],
+        "title": "LedgerEntryView"
+      },
+      "PODirectoryEntry": {
+        "properties": {
+          "po_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Po Id"
+          },
+          "po_number": {
+            "type": "string",
+            "title": "Po Number"
+          },
+          "vendor_name": {
+            "type": "string",
+            "title": "Vendor Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "cap_gross": {
+            "type": "string",
+            "title": "Cap Gross"
+          },
+          "committed_gross": {
+            "type": "string",
+            "title": "Committed Gross"
+          }
+        },
+        "type": "object",
+        "required": [
+          "po_id",
+          "po_number",
+          "vendor_name",
+          "status",
+          "currency",
+          "cap_gross",
+          "committed_gross"
+        ],
+        "title": "PODirectoryEntry"
+      },
+      "POLedgerView": {
+        "properties": {
+          "po_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Po Id"
+          },
+          "po_number": {
+            "type": "string",
+            "title": "Po Number"
+          },
+          "vendor_name": {
+            "type": "string",
+            "title": "Vendor Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "cap_gross": {
+            "type": "string",
+            "title": "Cap Gross"
+          },
+          "committed_gross": {
+            "type": "string",
+            "title": "Committed Gross"
+          },
+          "issued_at": {
+            "type": "string",
+            "title": "Issued At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "ledger_committed_gross": {
+            "type": "string",
+            "title": "Ledger Committed Gross"
+          },
+          "available_gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Gross"
+          },
+          "balance_reconciled": {
+            "type": "boolean",
+            "title": "Balance Reconciled"
+          },
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryView"
+            },
+            "type": "array",
+            "title": "Allocations"
+          },
+          "allocation_count": {
+            "type": "integer",
+            "title": "Allocation Count"
+          },
+          "allocations_truncated": {
+            "type": "boolean",
+            "title": "Allocations Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "po_id",
+          "po_number",
+          "vendor_name",
+          "status",
+          "currency",
+          "cap_gross",
+          "committed_gross",
+          "issued_at",
+          "expires_at",
+          "ledger_committed_gross",
+          "available_gross",
+          "balance_reconciled",
+          "allocations",
+          "allocation_count",
+          "allocations_truncated"
+        ],
+        "title": "POLedgerView"
+      },
+      "POPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PODirectoryEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next After"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_after",
+          "total_count"
+        ],
+        "title": "POPage"
+      },
+      "POView": {
+        "properties": {
+          "po_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Po Id"
+          },
+          "po_number": {
+            "type": "string",
+            "title": "Po Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "cap_gross": {
+            "type": "string",
+            "title": "Cap Gross"
+          },
+          "committed_gross": {
+            "type": "string",
+            "title": "Committed Gross"
+          },
+          "remaining_gross": {
+            "type": "string",
+            "title": "Remaining Gross"
+          },
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "APPROVED_ALLOCATION",
+              "ASSESSED_PO",
+              "PRINTED_REFERENCE"
+            ],
+            "title": "Relationship"
+          },
+          "balance_label": {
+            "type": "string",
+            "title": "Balance Label",
+            "default": "Current PO balance; other approvals may have changed it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "po_id",
+          "po_number",
+          "status",
+          "currency",
+          "cap_gross",
+          "committed_gross",
+          "remaining_gross",
+          "relationship"
+        ],
+        "title": "POView"
+      },
+      "ProcessingFailureView": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "MOCK_FIXTURE_NOT_FOUND",
+              "BYOK_CREDENTIALS_UNAVAILABLE"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "next_action": {
+            "type": "string",
+            "title": "Next Action"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "PERSISTED_EXTRACTION_ERROR",
+              "RECORDED_MOCK_HTTP_422"
+            ],
+            "title": "Provenance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "next_action",
+          "provenance"
+        ],
+        "title": "ProcessingFailureView"
+      },
+      "ProviderConfig": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "server",
+              "reviewer"
+            ],
+            "title": "Mode"
+          },
+          "supported_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Models"
+          },
+          "max_pdf_bytes": {
+            "type": "integer",
+            "title": "Max Pdf Bytes"
+          },
+          "max_pdf_pages": {
+            "type": "integer",
+            "title": "Max Pdf Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "supported_models",
+          "max_pdf_bytes",
+          "max_pdf_pages"
+        ],
+        "title": "ProviderConfig"
+      },
+      "ProviderConnection": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "models",
+          "expires_at"
+        ],
+        "title": "ProviderConnection"
       },
       "ReviewAccepted": {
         "properties": {
@@ -649,48 +1795,76 @@
         ],
         "title": "ReviewView"
       },
-      "RunEventResponse": {
+      "RuleCheckView": {
         "properties": {
-          "run_id": {
+          "rule_id": {
             "type": "string",
-            "format": "uuid",
-            "title": "Run Id"
+            "title": "Rule Id"
           },
-          "seq": {
-            "type": "integer",
-            "title": "Seq"
-          },
-          "type": {
+          "title": {
             "type": "string",
-            "title": "Type"
+            "title": "Title"
           },
-          "stage": {
+          "status": {
             "type": "string",
-            "title": "Stage"
+            "enum": [
+              "passed",
+              "failed",
+              "requires_review",
+              "not_evaluated"
+            ],
+            "title": "Status"
           },
-          "occurred_at": {
+          "description": {
             "type": "string",
-            "format": "date-time",
-            "title": "Occurred At"
+            "title": "Description"
           },
-          "payload": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Payload"
+          "provenance": {
+            "type": "string",
+            "title": "Provenance"
+          },
+          "finding_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Code"
+          },
+          "assessment_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment Revision"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Pages",
+            "default": []
           }
         },
         "type": "object",
         "required": [
-          "run_id",
-          "seq",
-          "type",
-          "stage",
-          "occurred_at",
-          "payload"
+          "rule_id",
+          "title",
+          "status",
+          "description",
+          "provenance"
         ],
-        "title": "RunEventResponse"
+        "title": "RuleCheckView"
       },
-      "RunStatus": {
+      "RunDetail": {
         "properties": {
           "run_id": {
             "type": "string",
@@ -744,6 +1918,208 @@
           "implementation_notice": {
             "type": "string",
             "title": "Implementation Notice"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "source_mode": {
+            "type": "string",
+            "title": "Source Mode"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "invoice_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Currency"
+          },
+          "invoice_total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Total"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractedField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "verification_findings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Verification Findings"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VendorView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purchase_order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/POView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_observations": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Observations"
+          },
+          "approved_gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Gross"
+          },
+          "review_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Request Id"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageView"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "processing_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Ms"
+          },
+          "processing_time_status": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "incomplete",
+              "pending"
+            ],
+            "title": "Processing Time Status"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageView"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCheckView"
+            },
+            "type": "array",
+            "title": "Checks",
+            "default": []
+          },
+          "business_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Explanation"
+          },
+          "processing_failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingFailureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -755,9 +2131,536 @@
           "thread_id",
           "created_at",
           "replay_mode",
-          "implementation_notice"
+          "implementation_notice",
+          "updated_at",
+          "source_mode",
+          "policy_version",
+          "model_id",
+          "reason_code",
+          "error_code",
+          "invoice_number",
+          "invoice_currency",
+          "invoice_total",
+          "fields",
+          "verification_findings",
+          "vendor",
+          "purchase_order",
+          "decision_observations",
+          "approved_gross",
+          "review_request_id",
+          "stages",
+          "processing_ms",
+          "processing_time_status",
+          "usage"
         ],
-        "title": "RunStatus"
+        "title": "RunDetail"
+      },
+      "RunEventResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "seq",
+          "type",
+          "stage",
+          "occurred_at",
+          "payload"
+        ],
+        "title": "RunEventResponse"
+      },
+      "RunPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "total_count"
+        ],
+        "title": "RunPage"
+      },
+      "RunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "job_state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPROVED",
+                  "NEEDS_REVIEW",
+                  "REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "vendor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor Name"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "total_gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Gross"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source_mode": {
+            "type": "string",
+            "title": "Source Mode"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "estimated_api_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Api Cost Usd"
+          },
+          "processing_failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingFailureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "created_at",
+          "job_state",
+          "decision",
+          "invoice_number",
+          "vendor_name",
+          "currency",
+          "total_gross",
+          "reason",
+          "source_mode"
+        ],
+        "title": "RunSummary"
+      },
+      "StageView": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "finished",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "elapsed_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "operation",
+          "status",
+          "started_at",
+          "finished_at",
+          "elapsed_ms"
+        ],
+        "title": "StageView"
+      },
+      "SubmitterRunDetail": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "job_state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPROVED",
+                  "NEEDS_REVIEW",
+                  "REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "source_mode": {
+            "type": "string",
+            "title": "Source Mode"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "invoice_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Currency"
+          },
+          "invoice_total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Total"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractedField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageView"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "processing_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Ms"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageView"
+          },
+          "processing_failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcessingFailureView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "job_state",
+          "decision",
+          "decision_reason",
+          "created_at",
+          "updated_at",
+          "source_mode",
+          "model_id",
+          "invoice_number",
+          "invoice_currency",
+          "invoice_total",
+          "fields",
+          "stages",
+          "processing_ms",
+          "usage",
+          "processing_failure"
+        ],
+        "title": "SubmitterRunDetail"
+      },
+      "UsageView": {
+        "properties": {
+          "recorded_attempts": {
+            "type": "integer",
+            "title": "Recorded Attempts",
+            "default": 0
+          },
+          "reserved_attempts": {
+            "type": "integer",
+            "title": "Reserved Attempts",
+            "default": 0
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "actual_billed_cost_usd": {
+            "type": "null",
+            "title": "Actual Billed Cost Usd"
+          },
+          "cost_status": {
+            "type": "string",
+            "enum": [
+              "estimated",
+              "unknown",
+              "not_applicable"
+            ],
+            "title": "Cost Status",
+            "default": "unknown"
+          },
+          "rate_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rate Sources",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "UsageView"
       },
       "ValidationError": {
         "properties": {
@@ -798,6 +2701,30 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VendorView": {
+        "properties": {
+          "vendor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vendor Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor_id",
+          "name",
+          "status"
+        ],
+        "title": "VendorView"
       }
     },
     "securitySchemes": {

@@ -6,24 +6,35 @@ from uuid import UUID
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.access import (
+    AccessView,
+    Principal,
+    access_view,
+    authenticate,
+    require_role,
+    submitter_reason,
+    visible_run,
+)
 from app.config import Settings
 from app.contracts import (
     API_PREFIX,
-    MAX_PDF_BYTES,
     Health,
     IntakeResponse,
     RunEventResponse,
-    RunStatus,
 )
 from app.db import make_engine
 from app.intake import create_intake, validate_pdf
-from app.models import Run, RunEvent
+from app.models import RunEvent
+from app.read_contracts import RunDetail, SubmitterRunDetail
+from app.read_routes import add_read_routes
+from app.read_service import detail, public_event
 from app.review_contracts import ReviewAccepted, ReviewCandidate, ReviewResponse, ReviewView
 from app.reviews import ReviewConflict, respond
 from app.workflow_models import ReviewRequest
@@ -31,6 +42,10 @@ from app.workflow_models import ReviewRequest
 
 def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
     settings = settings or Settings()
+    if settings.openai_credential_mode == "reviewer":
+        from app.provider_credentials import cipher
+
+        cipher(settings)
     owns_engine = engine is None
     engine = engine if engine is not None else make_engine(settings)
 
@@ -44,21 +59,35 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
     app.state.engine = engine
     bearer = HTTPBearer(auto_error=False)
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request, error):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": [
+                    {key: item[key] for key in ("type", "loc", "msg")} for item in error.errors()
+                ]
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
     def require_auth(
         credentials: Annotated[
             HTTPAuthorizationCredentials | None,
             Depends(bearer),
         ],
     ):
-        if credentials is None or not secrets.compare_digest(
-            credentials.credentials.encode(),
-            settings.app_api_token.get_secret_value().encode(),
-        ):
-            raise HTTPException(
-                401,
-                detail="Valid bearer credential required.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        return authenticate(settings, credentials.credentials if credentials else None)
+
+    def require_submitter(actor: Annotated[Principal, Depends(require_auth)]):
+        return require_role(actor, "submitter")
+
+    def require_finance(actor: Annotated[Principal, Depends(require_auth)]):
+        return require_role(actor, "reviewer")
+
+    @app.get(f"{API_PREFIX}/access", response_model=AccessView)
+    def get_access(actor: Annotated[Principal, Depends(require_auth)]):
+        return access_view(settings, actor)
 
     def require_reviewer(
         credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
@@ -78,6 +107,10 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
         return JSONResponse(
             status_code=503, content={"detail": "Database unavailable. Retry later."}
         )
+
+    from app.provider_routes import add_provider_routes
+
+    add_provider_routes(app, settings, engine, require_auth)
 
     @app.get(f"{API_PREFIX}/healthz", response_model=Health)
     def healthz():
@@ -115,7 +148,12 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
     )
     def process_invoice(
         file: Annotated[UploadFile, File()],
+        actor: Annotated[Principal, Depends(require_submitter)],
         source: Annotated[str | None, Form(max_length=200)] = None,
+        model_id: Annotated[str | None, Form(max_length=100)] = None,
+        provider_session: Annotated[
+            str | None, Header(alias="X-OpenAI-Session", max_length=200)
+        ] = None,
         idempotency_key: Annotated[
             str | None,
             Header(
@@ -125,21 +163,66 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
             ),
         ] = None,
     ):
-        content = file.file.read(MAX_PDF_BYTES + 1)
-        validate_pdf(content)
-        return create_intake(engine, content, source, idempotency_key)
+        content = file.file.read(settings.max_pdf_bytes + 1)
+        validate_pdf(content, max_bytes=settings.max_pdf_bytes)
+        if settings.openai_credential_mode == "reviewer":
+            from app.provider_credentials import purge_expired
+
+            purge_expired(engine)
+            if not provider_session or not model_id:
+                raise HTTPException(
+                    400, "Connect your OpenAI key and select a model before upload."
+                )
+        elif provider_session or model_id:
+            raise HTTPException(400, "This workspace uses its configured server model.")
+        return create_intake(
+            engine,
+            content,
+            source,
+            idempotency_key,
+            provider_token=provider_session,
+            model_id=model_id,
+            owner_id=actor.owner_id,
+        )
 
     @app.get(
         f"{API_PREFIX}/runs/{{run_id}}",
-        response_model=RunStatus,
+        response_model=RunDetail | SubmitterRunDetail,
         dependencies=[Depends(require_auth)],
     )
-    def get_run(run_id: UUID):
+    def get_run(run_id: UUID, actor: Annotated[Principal, Depends(require_auth)]):
         with Session(engine) as session:
-            run = session.scalar(select(Run).where(Run.id == run_id))
-            if run is None:
-                raise HTTPException(404, detail="Run not found.")
-            return RunStatus(
+            run = visible_run(session, run_id, actor)
+            if actor.role == "submitter":
+                info = detail(session, run)
+                return SubmitterRunDetail(
+                    run_id=run.id,
+                    job_state=run.job_state,
+                    decision=run.decision,
+                    decision_reason=submitter_reason(
+                        info["business_explanation"] or run.reason,
+                        info["reason_code"],
+                        run.decision,
+                    ),
+                    created_at=run.created_at,
+                    **{
+                        k: info[k]
+                        for k in (
+                            "updated_at",
+                            "source_mode",
+                            "model_id",
+                            "invoice_number",
+                            "invoice_currency",
+                            "invoice_total",
+                            "fields",
+                            "stages",
+                            "processing_ms",
+                            "usage",
+                            "processing_failure",
+                        )
+                    },
+                )
+            return RunDetail(
                 run_id=run.id,
                 job_state=run.job_state,
                 decision=run.decision,
@@ -153,6 +236,7 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                     else "Controlled processing requires explicit operator opt-in. "
                     "Approval authorizes downstream processing; no payment is executed."
                 ),
+                **detail(session, run),
             )
 
     @app.get(
@@ -162,34 +246,24 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
     )
     def get_events(
         run_id: UUID,
+        actor: Annotated[Principal, Depends(require_auth)],
         after_seq: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
     ):
         with Session(engine) as session:
-            if session.get(Run, run_id) is None:
-                raise HTTPException(404, detail="Run not found.")
+            visible_run(session, run_id, actor)
             events = session.scalars(
                 select(RunEvent)
                 .where(RunEvent.run_id == run_id, RunEvent.seq > after_seq)
                 .order_by(RunEvent.seq)
                 .limit(limit)
             )
-            return [
-                RunEventResponse(
-                    run_id=e.run_id,
-                    seq=e.seq,
-                    type=e.type,
-                    stage=e.stage,
-                    occurred_at=e.occurred_at,
-                    payload=e.payload_json,
-                )
-                for e in events
-            ]
+            return [public_event(e) for e in events]
 
     @app.get(
         f"{API_PREFIX}/runs/{{run_id}}/review",
         response_model=ReviewView,
-        dependencies=[Depends(require_auth)],
+        dependencies=[Depends(require_finance)],
     )
     def get_review(run_id: UUID):
         with Session(engine) as session:
@@ -245,5 +319,17 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
             raise HTTPException(404, detail="Review request not found.") from None
         except ReviewConflict as error:
             raise HTTPException(409, detail=str(error)) from None
+
+    add_read_routes(app, engine, require_auth, require_finance)
+    if settings.frontend_directory is not None:
+        from fastapi.responses import FileResponse
+        from fastapi.staticfiles import StaticFiles
+
+        directory = settings.frontend_directory.resolve(strict=True)
+        app.mount("/assets", StaticFiles(directory=directory / "assets"), name="ui-assets")
+
+        @app.get("/", include_in_schema=False)
+        def frontend():
+            return FileResponse(directory / "index.html", headers={"Cache-Control": "no-cache"})
 
     return app

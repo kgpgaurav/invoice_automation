@@ -1,0 +1,75 @@
+{
+  "mode": "LIVE_OPENAI_SYNTHETIC_FRONTEND_H1",
+  "pricing_date": "2026-11-12",
+  "rate_source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+  "runs": [
+    {
+      "mode": "LIVE_OPENAI_FRONTEND_H1",
+      "decision": "APPROVED",
+      "attempts": [
+        {
+          "model_id": "gpt-6-luna",
+          "input_tokens": "1130",
+          "output_tokens": "1356",
+          "cached_tokens": "0",
+          "cache_write_tokens": "1127",
+          "latency_ms": "11016",
+          "estimated_cost_usd": "0.0008191750",
+          "error_code": null
+        }
+      ],
+      "actual_billed_cost_usd": null,
+      "phase": "initial_browser"
+    },
+    {
+      "mode": "LIVE_OPENAI_FRONTEND_H1",
+      "decision": "APPROVED",
+      "attempts": [
+        {
+          "model_id": "gpt-6-luna",
+          "input_tokens": "1130",
+          "output_tokens": "1397",
+          "cached_tokens": "1127",
+          "cache_write_tokens": "0",
+          "latency_ms": "9562",
+          "estimated_cost_usd": "0.0007100700",
+          "error_code": null
+        }
+      ],
+      "actual_billed_cost_usd": null,
+      "phase": "responsive_pdf"
+    },
+    {
+      "mode": "LIVE_OPENAI_FRONTEND_H1",
+      "decision": "APPROVED",
+      "attempts": [
+        {
+          "model_id": "gpt-6-luna",
+          "input_tokens": "1130",
+          "output_tokens": "1334",
+          "cached_tokens": "1127",
+          "cache_write_tokens": "0",
+          "latency_ms": "10608",
+          "estimated_cost_usd": "0.0006785700",
+          "error_code": null
+        },
+        {
+          "model_id": "gpt-6-luna",
+          "input_tokens": "1153",
+          "output_tokens": "1379",
+          "cached_tokens": "0",
+          "cache_write_tokens": "1150",
+          "latency_ms": "11483",
+          "estimated_cost_usd": "0.0008335500",
+          "error_code": null
+        }
+      ],
+      "actual_billed_cost_usd": null,
+      "phase": "final_source_guard"
+    }
+  ],
+  "response_attempts": 4,
+  "total_estimated_cost_usd": "0.0030413650",
+  "actual_billed_cost_usd": null,
+  "note": "Three explicit H1 smoke runs during UI/verification fixes. Final source-guard run required one bounded evidence repair. Schema-valid response does not imply verified facts. No other live scenarios or payments."
+}

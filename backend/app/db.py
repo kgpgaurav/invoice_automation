@@ -9,9 +9,12 @@ class Base(DeclarativeBase):
 
 
 def make_engine(settings: Settings):
+    options = "-c statement_timeout=5000 -c timezone=UTC"
+    if settings.database_schema:
+        options += f" -c search_path={settings.database_schema}"
     return create_engine(
         settings.database_url.get_secret_value(),
         pool_pre_ping=True,
-        connect_args={"connect_timeout": 3, "options": "-c statement_timeout=5000 -c timezone=UTC"},
+        connect_args={"connect_timeout": 3, "options": options},
         hide_parameters=True,
     )

@@ -24,6 +24,20 @@ from app.workflow_models import ReviewAction, ReviewRequest, WorkflowRun
 GRAPH_VERSION = "invoice-graph-1"
 
 
+def check_workflow_infrastructure(engine, policy_version):
+    from sqlalchemy.orm import Session
+
+    with Session(engine) as session:
+        if session.get(PolicyVersion, policy_version) is None:
+            raise ValueError("Register the immutable policy before enabling processing")
+    with checkpoint_store(engine) as saver:
+        version = saver.conn.execute(
+            "SELECT max(v) AS version FROM checkpoint_migrations"
+        ).fetchone()["version"]
+        if version != len(saver.MIGRATIONS) - 1:
+            raise ValueError("Run explicit checkpoint setup before enabling processing")
+
+
 class InvoiceState(TypedDict, total=False):
     run_id: str
     generation: int
@@ -49,6 +63,7 @@ class WorkflowProcessor:
         source_mode="LIVE_OPENAI",
         rates=None,
         crash_hook=lambda _: None,
+        reservation_guard=lambda _: None,
     ):
         if source_mode not in ("LIVE_OPENAI", "MOCK_OPENAI") or route not in (
             "pdf",
@@ -59,19 +74,10 @@ class WorkflowProcessor:
         self.engine, self.extractor, self.policy_version = engine, extractor, policy_version
         self.route, self.source_mode, self.rates = route, source_mode, rates
         self.crash_hook = crash_hook
+        self.reservation_guard = reservation_guard
 
     def check_ready(self):
-        from sqlalchemy.orm import Session
-
-        with Session(self.engine) as session:
-            if session.get(PolicyVersion, self.policy_version) is None:
-                raise ValueError("Register the immutable policy before enabling processing")
-        with checkpoint_store(self.engine) as saver:
-            version = saver.conn.execute(
-                "SELECT max(v) AS version FROM checkpoint_migrations"
-            ).fetchone()["version"]
-            if version != len(saver.MIGRATIONS) - 1:
-                raise ValueError("Run explicit checkpoint setup before enabling processing")
+        check_workflow_infrastructure(self.engine, self.policy_version)
         if self.extractor.available(self.extractor.model) != 200:
             raise ValueError("Configured OpenAI model is unavailable; no jobs claimed")
 
@@ -164,6 +170,7 @@ class WorkflowProcessor:
 
             def reserve(attempt_id):
                 with owned_session(worker, claim) as s:
+                    self.reservation_guard(s)
                     work = s.get(WorkflowRun, claim.run_id)
                     if work.extraction_attempts >= 2:
                         raise ExtractionError("EXTRACTION_ATTEMPTS_EXHAUSTED")
@@ -231,6 +238,7 @@ class WorkflowProcessor:
                     "CRITICAL_LINE_FIELD_MISSING",
                     "UNVERIFIED_TOTAL",
                     "FINANCIAL_CONTRACT_INVALID",
+                    "PRINTED_FIELD_OMITTED",
                 }
                 if unresolved and attempts < 2:
                     return {"code": "CRITICAL_SOURCE_RETRY", "extraction_round": 1}

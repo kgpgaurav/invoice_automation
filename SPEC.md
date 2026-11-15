@@ -8,7 +8,7 @@
 
 ## Purpose and product boundaries
 
-Build a genuinely executable, buyer-friendly accounts-payable (AP) workflow. A user uploads a vendor invoice PDF; the system extracts fields using **one OpenAI provider/API key**, validates the evidence, matches an approved purchase order (PO), checks deterministic financial rules, and returns **APPROVED**, **NEEDS_REVIEW** (with an actionable question), or **REJECTED**, with a plain-English explanation and a permanent audit trail. When a reviewer supplies a decision, the **same LangGraph thread resumes** and all mandatory rules are re-evaluated. An approved invoice produces a **payment-ready export**, **not a payment**.
+Build a genuinely executable, buyer-friendly accounts-payable (AP) workflow. A user uploads a vendor invoice PDF; the system extracts fields using **OpenAI only**, with a configured server key or the explicit reviewer-key mode in §3.5, validates the evidence, matches an approved purchase order (PO), checks deterministic financial rules, and returns **APPROVED**, **NEEDS_REVIEW** (with an actionable question), or **REJECTED**, with a plain-English explanation and a permanent audit trail. When a reviewer supplies a decision, the **same LangGraph thread resumes** and all mandatory rules are re-evaluated. An approved invoice produces a **payment-ready export**, **not a payment**.
 
 The hiring brief requires a live end-to-end process, a visible execution view, a history/status/output dashboard, a five-minute video, and meaningful edge cases. Demo reliability and understandable business judgment outrank architectural novelty.
 
@@ -17,6 +17,8 @@ The hiring brief requires a live end-to-end process, a visible execution view, a
 **Fixed principles:** (1) LLM **extracts; Python decides**. (2) Missing/ambiguous evidence **never implies approval**. (3) No auto-approval beyond available PO funds/quantities. (4) Monetary values are `Decimal`, never `float`. (5) Each approval posts to a unique ledger **at most once**. (6) Replay/demo-cached responses must be visibly marked, never represented as a live AI run.
 
 **Working stack:** React + Vite + TypeScript + Tailwind/shadcn/ui; FastAPI + Pydantic v2 + SQLAlchemy/Alembic; LangGraph + Postgres checkpointer; PostgreSQL for business data, durable work queue and events; PyMuPDF for PDF text/evidence; OpenAI Responses API + Structured Outputs; SSE with polling fallback; Pytest. Default deploy: always-on hosted API + managed PostgreSQL + static frontend. Lock a specific provider only after checking sleeping/instance and persistent-storage behavior.
+
+Deployment target clarification (2026-11-14, explicitly requested): prepare the private demonstration for Vercel Hobby frontend/FastAPI Services plus a separate persistent worker Daemon and external session-preserving PostgreSQL. The worker/financial contracts remain unchanged. The Vercel direct-upload demo profile permits at most **4 MiB (4,194,304 bytes)**, allowing room for multipart overhead below the platform's request cap; the normal local/API default and database ceiling remain **12 MiB**. Both profiles require an unencrypted one-to-five-page PDF. Existing GET /openai/config exposes active max_pdf_bytes/max_pdf_pages, and frontend notes/validation follow those values. This profile is not deployed or verified on the provider; database, free quotas and hosted acceptance remain open. See docs/DEPLOYMENT.md for the gates and historical Render status.
 
 ---
 
@@ -228,6 +230,18 @@ Guardrails: retries bounded (two total extraction attempts), no unbounded graph 
 - Prompt: fixed extraction instructions, output schema, never obey invoice instructions, return null for missing fields, source evidence. Exclude unnecessary reasoning prose. Store actual `input_tokens`, `cached_tokens`, `output_tokens`, `model`, `latency_ms` and `estimated_usd`. No self-reported model confidence threshold.
 - Parse and cross-verify numbers with `Decimal`; if the text layer has absent/incorrect layout or scan is image-only, use the multimodal benchmark winner.
 
+### Reviewer-supplied credentials extension (2026-11-14, explicitly requested)
+
+An opt-in `OPENAI_CREDENTIAL_MODE=reviewer` replaces the deployment's shared OpenAI key with reviewer-supplied OpenAI credentials. Existing private workspace/reviewer authorization remains required and separate from provider billing authorization; this is not public multi-tenant signup or isolation. The reviewer submits a key over HTTPS, chooses an account-listed model from the app's tested PDF/Responses/Structured Outputs allowlist, and explicitly starts processing. Model listing does not prove Responses permission, available credit or extraction correctness.
+
+Terminology clarification: the earlier “reviewer-supplied” key refers to a case-study evaluator testing extraction. In the business roles defined in §4.1, the invoice submitter supplies extraction credentials; the financial reviewer needs only review authorization. The configuration value `reviewer` is retained for compatibility and does not grant that business role.
+
+Temporary keys are authenticated-encrypted in PostgreSQL using a stable API/worker environment encryption secret. Access expires after at most 24 hours; explicit disconnect revokes access and erases ciphertext. Expired ciphertext is removed on access and by cleanup; downtime can delay physical cleanup but never extends authorization. Browser storage, public responses, logs, checkpoints and events contain no plaintext key. Only a short-lived opaque capability is returned to the originating tab. An already dispatched provider call may complete and be charged after disconnect.
+
+Intake atomically freezes the credential reference and selected model with the PDF, run and queue item. Recovery uses that binding and the existing bounded extraction-attempt budget, checks validity before each new provider attempt, and never falls back to the operator's key. Previously persisted extraction may be reused without a new call. Model changes apply to new runs only; financial policy, row/advisory locks and reviewer permissions are unchanged. Existing server-key and labelled mock modes remain available separately.
+
+Add authenticated `POST /api/v1/openai/sessions` and `DELETE /api/v1/openai/session`, plus a non-secret `GET /api/v1/openai/config`. Reviewer-mode intake requires the opaque `X-OpenAI-Session` header and multipart `model_id`; existing server-mode intake remains compatible. Routine verification uses mocked OpenAI transport, not billable model calls.
+
 ## 3.6 Failure fallback / replay mode (transparent)
 
 - **Normal demo:** real API request and genuinely executing stages; verify OpenAI billing/key and hosting immediately before interview.
@@ -242,6 +256,14 @@ Guardrails: retries bounded (two total extraction attempts), no unbounded graph 
 **Base path:** `/api/v1`; UUID resource IDs; all financial amounts as decimal strings; UTC timestamps. Server is authoritative. Authentication required for uploads, PDFs, reviews and policy changes; only authorized reviewer can resolve exceptions.
 
 ## 4.1 Endpoints
+
+### Private role-access extension (2026-11-14, explicitly requested)
+
+Opt-in `ACCESS_MODE=roles` uses individual operator-issued submitter identities/access tokens and a distinct financial-reviewer credential. The server determines role. Submitters may upload, configure their own OpenAI connection, and read only their own invoice history/status/reason/cost/timeline/PDF. They cannot access review candidates/actions, PO registers/ledgers, company metrics or internal finance screens. Reviewers can inspect workspace invoices and finance/review features, but cannot upload or configure extraction credentials. Both roles use the same application with different allowed navigation and server permissions. This is private-workspace authorization, not public signup or production multi-tenant identity.
+
+Owners of new runs/provider sessions are server-derived and immutable; ownerless legacy records remain reviewer-only. Intake idempotency and pagination are submitter-scoped. Unauthorized resource reads return 404 and forbidden feature access returns 403. Role-specific run details omit internal finance/candidate/ledger data. Existing shared mode remains explicitly available for compatibility. Add authenticated `GET /api/v1/access` returning the current principal and permitted pages. Financial policy and worker/approval safeguards do not change.
+
+The agreed case-study profile pre-assigns three submitter identities and one financial reviewer using distinct static access tokens. Generate secrets once per workspace, configure them only server-side and retain their identity mappings across restarts. Assign one submitter slot per person; sharing a slot shares its invoice visibility. This is the demonstration profile, not a global account limit or public signup flow. README must distinguish this implemented access scheme from proposed stronger authentication.
 
 | Method | Path | Contract |
 |---|---|---|

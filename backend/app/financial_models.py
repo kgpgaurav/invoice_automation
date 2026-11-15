@@ -137,3 +137,4 @@ class FinancialAssessment(Base):
     decision: Mapped[str] = mapped_column(String(30))
     code: Mapped[str] = mapped_column(String(80))
     reason: Mapped[str] = mapped_column(String(1000))
+    observations_json: Mapped[dict | None] = mapped_column(JSON)

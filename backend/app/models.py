@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app import (
     extraction_store,  # noqa: F401
     financial_models,  # noqa: F401
+    provider_models,  # noqa: F401
     workflow_models,  # noqa: F401
 )
 from app.db import Base
@@ -35,6 +36,8 @@ class Document(Base):
 class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (
+        Index("ix_runs_history", "created_at", "id"),
+        Index("ix_runs_owner_history", "owner_id", "created_at", "id"),
         CheckConstraint(
             "job_state IN ('QUEUED','RUNNING','WAITING_REVIEW','COMPLETED','FAILED','INTERRUPTED')"
         ),
@@ -42,6 +45,7 @@ class Run(Base):
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     document_id: Mapped[UUID] = mapped_column(ForeignKey("documents.id"))
+    owner_id: Mapped[str | None] = mapped_column(String(64))
     document_uri: Mapped[str] = mapped_column(String(100))
     document_sha256: Mapped[str] = mapped_column(String(64))
     source: Mapped[str | None] = mapped_column(String(200))

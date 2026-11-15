@@ -1,0 +1,24 @@
+{
+  "mode": "LIVE_OPENAI_BYOK_SYNTHETIC_H1",
+  "invoice_count": 1,
+  "model": "gpt-6-luna",
+  "job_state": "COMPLETED",
+  "decision": "APPROVED",
+  "source_mode": "LIVE_OPENAI",
+  "ledger_entries": 1,
+  "attempts": [
+    {
+      "model": "gpt-6-luna",
+      "input_tokens": 1130,
+      "output_tokens": 1312,
+      "cached_tokens": 0,
+      "cache_write_tokens": 1127,
+      "latency_ms": 12094,
+      "error_code": null,
+      "dated_rate_estimate_usd": "0.000797175"
+    }
+  ],
+  "rate_source": "2026-11-12 https://developers.openai.com/api/docs/models/gpt-6-luna",
+  "actual_billed_cost_usd": null,
+  "verified_on": "2026-11-14"
+}
