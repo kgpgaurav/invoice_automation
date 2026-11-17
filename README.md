@@ -6,6 +6,8 @@ Invoice-PDF intake, source verification, purchase-order matching and recorded fi
 
 [Submit an invoice](https://invoiceautomation-seven.vercel.app/?view=upload) · [Financial review](https://invoiceautomation-seven.vercel.app/?view=review) · [GitHub repository](https://github.com/kgpgaurav/invoice_automation)
 
+**Local UI update (17 November):** the selected operational redesign, locally bundled **DM Sans** typography and before-upload OpenAI setup guide are available in the working tree for review; they have not been deployed. The tutorial below uses the new screen labels. The current public deployment may still show the previous layout. Local changes include a dedicated access screen, role-specific landing pages and a reviewer queue with an adjacent invoice/PDF/action panel. See [visual QA](design-qa.md) and [development results](docs/DEVELOPMENT.md).
+
 ## Deployment status
 
 The frontend and API are deployed on Vercel, with Supabase PostgreSQL. Public checks on **16 November 2026** returned HTTP 200 for the application and these endpoints:
@@ -24,20 +26,23 @@ Ask the submission owner privately for your assigned **workspace access token**.
 
 | Role               | Available screens                                                       | OpenAI API key needed?             |
 | ------------------ | ----------------------------------------------------------------------- | ---------------------------------- |
-| Invoice submitter  | Process Invoice, My Invoices and their own invoice details/PDF/timeline | Yes, their own key for extraction. |
-| Financial reviewer | Review Queue, Invoice History, Purchase Orders and Overview             | No.                                |
+| Invoice submitter  | My invoices, Submit invoice, OpenAI connection and their own invoice details/PDF/timeline | Yes, their own key for extraction. |
+| Financial reviewer | Review queue, Invoice history, Purchase orders and Overview             | No.                                |
 
 The workspace token identifies you inside this app. Your OpenAI API key authorizes extraction charges on your OpenAI account; it does not grant reviewer access. Access tokens, provider keys and database credentials are never published in this README.
 
 ## Tutorial: submit an invoice
 
-1. Open the [live application](https://invoiceautomation-seven.vercel.app/). In **Workspace access token**, enter your assigned submitter token and click **Connect**. If needed, open **Connect workspace** in the top bar.
-2. Open **Process Invoice**. In **Your OpenAI connection**, enter your own OpenAI API key and click **Connect OpenAI**. Choose an **Invoice extraction model** from the offered list. Only models both listed for your account and supported by the pipeline are offered; listing does not guarantee Responses permission or available credit.
-3. Choose one invoice PDF: **at most 4 MiB (4,194,304 bytes), one to five pages, unencrypted**. The upload form displays the active server limit. The normal local API default is 12 MiB. Only INR invoices can authorize financial approval; other printed currencies are preserved for review.
-4. Click **Process invoice**. The API stores the original PDF and queues a durable run. The separate worker performs extraction, evidence checks and financial validation. An upload receipt or queued status is not an approval.
-5. Follow the invoice's **Processing timeline** and read its outcome and explanation. Its detail page includes the source PDF, extracted information and recorded usage where available. **My Invoices** shows only your own submissions and supports search and status/decision filters.
-6. If the invoice **Needs review**, a financial reviewer handles the exception. Submitters cannot select review candidates, inspect company PO balances or approve an exception themselves.
-7. Use **Disconnect OpenAI** when finished. Use the workspace access controls to disconnect from the app.
+**Before adding an invoice in the personal-key workspace, connect your own OpenAI API key and select a model.** Enter that key only on **OpenAI connection**. The initial **Workspace access token** field takes your assigned app token instead. Financial reviewers do not need an OpenAI key. Explicitly configured mock/server-managed workspaces supply their own extraction connection and do not ask for a personal key.
+
+1. Open the application. In **Workspace access token**, enter your assigned submitter token and click **Connect**. Your default screen is **My invoices**; navigation appears only after access is verified.
+2. Open **OpenAI connection** in the sidebar. Enter **Your OpenAI API key** and click **Connect OpenAI**.
+3. Choose an **Invoice extraction model** from the offered list. A connected key alone is not enough to enable submission. Only models both listed for your account and supported by the pipeline are offered; listing does not guarantee Responses permission or available credit.
+4. Click **Continue to submit invoice**. Choose one PDF: **at most 4 MiB (4,194,304 bytes), one to five pages, unencrypted** on the selected Vercel profile. The form displays the active server limit; normal local/API defaults allow 12 MiB. Only INR invoices can authorize financial approval; other printed currencies are preserved for review.
+5. Click **Submit invoice**. The API stores the original PDF and queues a durable run. The separate worker performs extraction, evidence checks and financial validation. An upload receipt or queued status is not an approval.
+6. Follow the invoice's **Processing timeline** and read its outcome and explanation. Its detail page includes the source PDF, extracted information and recorded usage where available. **My invoices** shows only your own submissions and supports search and status/decision filters.
+7. If the invoice **Needs review**, a financial reviewer handles the exception. Submitters cannot select review candidates, inspect company PO balances or approve an exception themselves.
+8. In **OpenAI connection**, use **Disconnect OpenAI** when finished. Open your account control in the sidebar (the user icon on a phone) and click **Disconnect** to leave the workspace.
 
 You can process multiple invoices with one OpenAI connection in the same tab for up to 24 hours; you do not need a new key for every invoice. Refreshing, opening a new tab, disconnecting or expiry requires reconnecting for new uploads. Reuse the same OpenAI key if it is still valid. Workspace access also needs reconnecting after refresh because credentials are held in tab memory.
 
@@ -46,7 +51,7 @@ OpenAI keys are temporarily encrypted on the server and are not saved in browser
 ## Tutorial: review an exception
 
 1. Open [Financial review](https://invoiceautomation-seven.vercel.app/?view=review) and connect with your assigned **financial-reviewer token**. No OpenAI key is required. To test both roles, use separate browser tabs and each role's own token.
-2. Open **Review Queue** and select an invoice. Inspect the PDF, recorded findings, decision explanation and purchase-order context. **Invoice History** includes workspace invoices; **Purchase Orders** exposes current balances and approved allocations; **Overview** summarizes recorded activity.
+2. You land on **Review queue**, including when it is empty. Select an invoice to inspect its PDF and next action beside the queue on desktop. On smaller screens, select a row to open its detail and use **Back to review queue** to return. **Expand PDF** opens a larger document view; Escape closes it. **Invoice history** includes workspace invoices; **Purchase orders** exposes current balances and approved allocations; **Overview** summarizes recorded activity.
 3. In the **Human review** panel, choose one of the actions actually offered for that exception. For a missing or ambiguous PO, choose **Select PO & resume**, compare the offered candidates, and select the supporting PO.
 4. Enter a **Review rationale**, then click **Confirm selection & resume**. The action is saved and the same workflow thread resumes. Current vendor/PO state, duplicate identity and available funds are rechecked before any approval is posted. Observe the resulting decision rather than treating the selection itself as approval.
 5. Where offered, **Reject invoice** records a rejection; **Request source information & stop** records the information request and stops that run. It does not send an email or automatically collect a corrected document.
@@ -90,7 +95,7 @@ H2's justified INR 2 rounding fixture remains unavailable. An unexplained discre
 | Access rejected / HTTP 401                    | Re-enter your assigned workspace token. An OpenAI key is not a workspace token.                                                                                      |
 | Screen unavailable / HTTP 403                 | Check your assigned role; submitters cannot use finance features.                                                                                                    |
 | Run not found / HTTP 404                      | Confirm the run belongs to your identity. Other submitters' runs are deliberately hidden.                                                                            |
-| Process button disabled                       | Wait for upload configuration, connect your OpenAI key, select a model and choose a valid PDF.                                                                       |
+| Submit invoice disabled                       | Wait for upload configuration and choose a valid PDF. In personal-key mode, complete OpenAI connection and select a model first; use **Set up connection** above the upload form. |
 | HTTP 413 / HTTP 422                           | Follow the displayed upload error: reduce file size or check PDF validity, page count, encryption and required fields. No extraction is started for rejected intake. |
 | Run stays Queued                              | Ask the operator to check worker activation, logs and database access. API readiness alone does not prove a worker is running.                                       |
 | OpenAI connection expired / processing failed | Read the recorded reason. Reconnect for new uploads if needed; do not repeatedly submit paid runs without addressing the cause. Original PDFs remain stored.         |

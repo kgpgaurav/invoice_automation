@@ -1,5 +1,76 @@
 # Development and verification
 
+## DM Sans and OpenAI setup guidance (2026-11-17 follow-up)
+
+The user selected DM Sans and asked for instructions to connect OpenAI before adding an invoice, with documentation aligned to the new UI. Read the canonical SPEC/AGENTS and current docs first; recorded the decision before code. Preserve the existing uncommitted redesign and user data. This follow-up changes presentation/docs only under SPEC §§3.5/4.3; no backend source, API schema, credential mode/lifetime, migrations, financial rules, worker or secret configuration changed.
+
+- `frontend/package.json` / `package-lock.json`: exact `@fontsource-variable/dm-sans@5.3.0` asset dependency. `frontend/src/main.tsx` imports its normal variable `standard.css`. Both Latin and extended subsets are bundled locally (62.72 / 31.29 kB WOFF2) so ₹ has font coverage, without a browser font-CDN request. Preserve upstream OFL text in `frontend/public/licenses/DM-Sans-OFL.txt`.
+- `frontend/src/styles.css` / `workspace.css`: a shared `--font-ui` family, optical sizing and DM Sans for interface and human-facing invoice/PO headings. Preserve technical monospace identifiers, tabular numerals, font sizes, colors and layout.
+- `frontend/src/App.tsx`: explicit pre-upload key/model sequence, distinct connected-without-model/expired text and truthful workspace-managed instructions. `OpenAIConnection.tsx` adds a three-step setup guide and connected-state guidance. `Upload.tsx` explains why personal-key submission is disabled; selected-file copy no longer claims readiness before connection/model prerequisites are met. Existing submission/idempotency/session cleanup remains unchanged.
+- `frontend/tests/provider.spec.ts`: extend the existing real-browser test to check the three-step guide, missing key/model/ready instructions, disabled submission with a file alone, managed-profile compatibility, actual two-subset webfont loading for `Invoice ₹11,800.00`, computed family, and 1440/390px screenshots without overflow. Existing provider disconnect/late-response/boundary tests remain.
+- `README.md`, `docs/RUNNING.md`, `docs/REVIEWER_KEYS.md`: current navigation, key/model-before-PDF tutorial, profile differences, key reuse/expiry and correct account disconnect. Correct the old mock-only “never enter a browser key” wording using SPEC's explicit personal-key form exception; financial reviewers do not need a key. `SPEC.md` records the expressly selected typography/setup clarification; DECISIONS/PROGRESS and visual QA record the result.
+
+Final checks for this follow-up:
+
+| Check | Result |
+| --- | --- |
+| Mocked shared/provider/workflow browser runner, Chrome, ports 8100/5273 | **14 passed in 2.7m**; 8 role-only cases skipped here and run separately |
+| Same runner with `--roles` | **8 passed in 59.3s**, including reviewer resume without an OpenAI key |
+| `npm.cmd run format:check` and `npm.cmd run build` | Passed, including TypeScript and both bundled font subsets; existing PDF.js chunk warning remains |
+| API hash / backend diff checks | Generated OpenAPI/TypeScript hashes identical to the prior baseline; zero backend source changes |
+| Isolated manual Playwright capture | DM Sans family confirmed; queue/document/modal and 768/390 layouts inspected; `consoleErrors: []`, `focusReturned: true` |
+| Fresh `npm audit --json` | Zero vulnerabilities in the fresh audit report. Installation initially printed a conflicting four-high summary; no unrelated dependency upgrades or forced audit fixes were applied. |
+
+No full backend/Ruff/migration rerun was needed for this CSS/copy slice; the **prior** 220-pass backend/migration result below is historical, not a newly repeated claim. All routine browser processing uses explicit mocked OpenAI and isolated loopback schemas; no provider charges. The manual local preview gained additional matching fixture rows during work, so its screenshot helper was changed from ambiguous display text to the original known run URL. No user records were reset, removed or approved by that helper. Accepted new DM Sans/setup screenshots are in `docs/screenshots/ui-2026-11-17/dm-sans-*.png`; older images retain their historical typography. Changes remain uncommitted, without push or deployment.
+
+## Selected operational UI (2026-11-17, local review)
+
+Read AGENTS.md, SPEC.md, README.md, DECISIONS.md and this development record before implementation; reviewed the existing frontend/access behavior and the live signed-out screen. Used the explicitly invoked Product Design image-to-code workflow and frontend-design guidance against the user's selected inline queue/detail mockup. The user authorized a fresh isolated Playwright browser after native Computer Use could not verify the URL. The decision and tradeoffs were recorded before code; SPEC §4.3 records only the explicitly requested presentation change. Financial rules, API payloads, database/migrations, owner checks, worker locks/leases and approval transactions are unchanged.
+
+The signed-out app now shows a dedicated workspace-access screen without finance navigation or counts. Server-verified submitters land on My invoices, with Submit invoice and OpenAI connection. Reviewers land on Review queue even when empty, with Invoice history, Purchase orders and Overview. The connection route is checked against the existing server upload capability; no new permission or role picker. Shared mode retains its compatibility tools and separate reviewer credential. Access and provider capabilities remain in tab memory, with existing server expiry/revocation and cleanup of late provider responses.
+
+Review queue uses real `/runs?state=WAITING_REVIEW` records, filters/cursors, selected URL state, refresh and event-driven updates. Desktop displays queue/detail together; tablet/phone select a row and return via Back to review queue or browser navigation. Selection is not authorization. The detail reuses RunView's authenticated document fetch, persisted event stream/poll fallback, generation-aware review response and idempotency. All offered PO candidates remain available, no PO is preselected, rationale is required, submit-pending protection remains, conflicts refresh the record and response messages do not imply approval. The original PDF renders in a bounded scrollable preview and a larger native modal with explicit initial focus, Escape close and restored focus. Known single-page PDFs omit disabled paging; multi-page paging remains. Technical/check/evidence detail is secondary. All displayed counts, values, reasons and receipt ages derive from API records; absent fields remain unknown.
+
+Changed source files and purpose (all paths below are relative to the repository):
+
+| Files | Purpose |
+| --- | --- |
+| `frontend/src/App.tsx` | Entry gate, server-derived role navigation/defaults, OpenAI setup route/prerequisites and account disconnect; remove assignment chrome/footer |
+| `frontend/src/ReviewQueue.tsx` (new) | Actual-data queue, URL selection/search/cursors, responsive list/detail and loading/empty/error states |
+| `frontend/src/ReviewDetail.tsx` (new) | Compact invoice/outcome/document/PO/review composition using existing run/review DTOs |
+| `frontend/src/DocumentPanel.tsx` (new) | Private PDF preview and accessible expansion, without another document endpoint |
+| `frontend/src/RunView.tsx` | Optional embedded presentation reusing existing fetching/events/refresh/review behavior; secondary extracted disclosure |
+| `frontend/src/ReviewForm.tsx` | Compact offered-candidate/action/rationale layout, explicit disabled reasons and revalidation copy; existing request fingerprint/idempotency guard preserved |
+| `frontend/src/PDFPreview.tsx` | Omit redundant controls only when the document is known to have one page |
+| `frontend/src/Upload.tsx`, `OpenAIConnection.tsx` | Submit-invoice copy, setup guidance, secondary security explanation, provider double-submit guard; existing upload/session cleanup unchanged |
+| `frontend/src/History.tsx`, `Overview.tsx`, `PurchaseOrders.tsx`, `SubmitterRunView.tsx` | Consistent sentence-case headings, simpler chrome and distinct empty-history copy |
+| `frontend/src/workspace.css` (new), `main.tsx` | Focused workspace styling using the established neutral/olive tokens, compact type, responsive shell/cards/forms/dialog; existing component styles reused |
+| `frontend/src/ui.tsx`, `frontend/package.json`, `package-lock.json`, `frontend/public/favicon.svg` (new) | Replace handwritten icons with one exact UI-only dependency, `@phosphor-icons/react@2.1.10`; favicon exported from its Invoice icon |
+| `frontend/index.html` | Invoice operations title, description and favicon |
+| `frontend/tests/provider.spec.ts`, `roles.spec.ts`, `workflow.spec.ts` | Preserve existing semantic regressions with new navigation/copy; add four role-entry/navigation cases and expand reviewer PDF/mobile/pending-submit checks |
+| `.gitignore` | Ignore browser intermediates in `output/playwright/` and `.playwright-cli/`; existing secret/environment/PDF ignores retained |
+| `README.md`, `SPEC.md`, `docs/DECISIONS.md`, `docs/ROLE_ACCESS.md`, `docs/RUNNING.md`, `PROGRESS.md`, this file | Agreed presentation contract, exact local tutorial, decisions, results and limits; no claim that the new UI is deployed |
+| `design-qa.md` (new), `docs/screenshots/ui-2026-11-17/` (8 PNGs) | Source comparison, findings/fixes, screenshots of actual synthetic/mock runtime and explicit verification boundaries |
+
+Verification commands and final results:
+
+| Check | Result |
+| --- | --- |
+| Backend `.venv/Scripts/python.exe -m pytest -q --tb=short --basetemp=../.local/pytest-ui`, explicit loopback TEST_DATABASE_URL | **220 passed, 3 opt-in live skips, 304.86s**; includes all migration upgrade/metadata-parity/downgrade/re-upgrade, finance, queue, concurrency, ownership and rollback regressions |
+| `.venv/Scripts/ruff.exe check .` / `format --check .` | Passed; 93 Python files formatted |
+| `PS1_BROWSER_CHANNEL=chrome python -m scripts.browser_checks --api-port 8100 --ui-port 5273` | **14 passed in 2.9m**, 8 role-only cases skipped here and run separately |
+| Same runner with `--roles` | **8 passed in 1.4m**, including the three existing submitters, reviewer resume, entry gate, defaults, denial, empty/error/no-results, mobile/back/selected URLs, modal focus and pending-response guard |
+| `python -m scripts.export_openapi` / `npm run generate:api` | Passed; SHA-256 of both OpenAPI and generated TypeScript identical before/after |
+| `npm run format:check` / `npm run build` | Passed, including TypeScript; final centering-only CSS adjustment rebuilt successfully |
+| Isolated CLI browser capture | Original reference width 1487, desktop 1440, tablet 768, phone 390; actual rendered PDF inspected, no document overflow, `consoleErrors: []`, focus restored after Escape |
+| Git / configured-secret checks | Whitespace check passed; no staged files; 219 tracked/unignored files scanned with zero configured non-example credential matches. The initial match was the already-public loopback development URL in `.env.example`, classified explicitly without printing values. |
+
+Test setup used fresh marked loopback PostgreSQL schemas and mocked extraction only. Browser runners reset only their own schemas/processes and retain private inactive local files. Existing user services, workspaces and hosted data were not reset. The same existing project PostgreSQL cluster on 55432 was started without initialization; 5432 was untouched. The retained visual preview uses its own isolated mock API/worker/UI on 8110/5280, with configuration under ignored `.local/ui-preview.json` and its generated demo folder. It contains no live OpenAI key. Do not use its synthetic masters/credentials as production configuration.
+
+Failures investigated and corrected: Windows sandbox blocked Vite config traversal, so build/browser commands were rerun with the required filesystem access. A formatting save triggered hot reload during the first reviewer test and cleared tab-only authentication; stable reruns passed. The next modal test exposed initial-focus behavior and was fixed explicitly; the later dependent empty-queue assertion then passed. The old post-refresh signed-out assertion was updated to the new entry-screen contract without removing its retained-run-URL check. One formatting command used the wrong working directory and was rerun correctly. No failing financial test, disabled assertion or hidden retry was used to reach the final results.
+
+Warnings/limits: pytest emitted one existing Windows cache-directory ACL warning; tests themselves passed. Vite retains its existing >500-kB PDF.js chunk warning; browser output retains the benign Node NO_COLOR/FORCE_COLOR warning. Broader real-layout/multi-page visual evaluation, exact font/pixel matching and hosted browser tests are not claimed. Original highlighting, policy editor, re-evaluation/export gaps, commercial-layout/scanned evidence limits and hosted worker/master-data activation remain outside this UI slice. No live provider call, production worker activation, remote mutation, commit, push or deployment occurred. Changes are left uncommitted for review.
+
 ## Active PDF-size note and Vercel upload profile (2026-11-14)
 
 The user reaffirmed Vercel and requested a frontend note stating allowed PDF size and next deployment steps. SPEC was read fully; §§3.5 and 4.3 and the explicit deployment-profile clarification govern this small slice. DECISIONS.md records the safe 4-MiB Vercel profile before code. Normal local/other API instances retain their 12-MiB default and database ceiling; both use one-to-five-page unencrypted PDFs.

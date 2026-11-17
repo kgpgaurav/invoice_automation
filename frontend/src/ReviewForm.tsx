@@ -8,6 +8,7 @@ export default function ReviewForm({
   notify,
   reasonCode,
   authorizedToken,
+  compact = false,
 }: {
   review: Review;
   onSubmitted: () => void;
@@ -15,8 +16,11 @@ export default function ReviewForm({
   notify: (s: string) => void;
   reasonCode?: string | null;
   authorizedToken?: string;
+  compact?: boolean;
 }) {
-  const [action, setAction] = useState(''),
+  const [action, setAction] = useState(
+      review.allowed_actions.includes('SELECT_PO') ? 'SELECT_PO' : '',
+    ),
     [po, setPo] = useState(''),
     [reason, setReason] = useState(''),
     [reviewerToken, setReviewerToken] = useState(''),
@@ -25,6 +29,7 @@ export default function ReviewForm({
   const requestKey = useRef({ fingerprint: '', key: crypto.randomUUID() }),
     pending = useRef(false);
   const credential = authorizedToken ?? reviewerToken;
+  const ready = Boolean(action && credential && reason.trim() && (action !== 'SELECT_PO' || po));
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (
@@ -70,35 +75,73 @@ export default function ReviewForm({
     }
   }
   return (
-    <section id="human-review" className="review-panel" aria-label="Human review">
-      <div className="review-intro">
-        <span className="review-icon">
-          <Icon name="shield" size={23} />
-        </span>
-        <div>
-          <p className="eyebrow">AUTHORIZED REVIEW</p>
-          <h2>
-            {review.kind === 'PO_SELECTION'
-              ? 'Choose the supporting purchase order'
-              : 'Resolve this exception'}
-          </h2>
-          <p>
-            {review.kind === 'PO_SELECTION'
-              ? 'The invoice did not establish a supporting PO. Compare the offered candidates and select the procurement record you can substantiate.'
-              : reasonCode === 'BANK_MISMATCH'
-                ? 'Independently verify bank information using your established vendor contact process. This is a change warning, not a fraud finding.'
-                : reasonCode === 'PO_CAP_EXCEEDED'
-                  ? 'The invoice exceeds the recorded available PO balance. An authorized PO amendment or corrected source is needed; this form cannot waive the cap.'
-                  : 'This invoice is held. Inspect the recorded checks and supporting figures before choosing a permitted action.'}
-          </p>
-          <small>
-            Selection never waives financial rules. Funds are rechecked when processing resumes.
-          </small>
+    <section
+      id="human-review"
+      className={'review-panel' + (compact ? ' compact-review' : '')}
+      aria-label="Human review"
+    >
+      {!compact && (
+        <div className="review-intro">
+          <span className="review-icon">
+            <Icon name="shield" size={23} />
+          </span>
+          <div>
+            <h2>
+              {review.kind === 'PO_SELECTION'
+                ? 'Choose the supporting purchase order'
+                : 'Resolve this exception'}
+            </h2>
+            <p>
+              {review.kind === 'PO_SELECTION'
+                ? 'The invoice did not establish a supporting PO. Compare the offered candidates and select the procurement record you can substantiate.'
+                : reasonCode === 'BANK_MISMATCH'
+                  ? 'Independently verify bank information using your established vendor contact process. This is a change warning, not a fraud finding.'
+                  : reasonCode === 'PO_CAP_EXCEEDED'
+                    ? 'The invoice exceeds the recorded available PO balance. An authorized PO amendment or corrected source is needed; this form cannot waive the cap.'
+                    : 'This invoice is held. Inspect the recorded checks and supporting figures before choosing a permitted action.'}
+            </p>
+            <small>
+              Selection never waives financial rules. Funds are rechecked when processing resumes.
+            </small>
+          </div>
         </div>
-      </div>
+      )}
       <form onSubmit={submit}>
         <fieldset disabled={busy}>
           <legend className="sr-only">Review response</legend>
+          {action === 'SELECT_PO' && (
+            <div className="po-options">
+              <h2>Matching purchase order</h2>
+              {!review.options.length && (
+                <p>No purchase order candidates are available. Choose another permitted action.</p>
+              )}
+              {review.options.map((candidate) => (
+                <label
+                  className={`po-option ${po === candidate.po_id ? 'selected' : ''}`}
+                  key={candidate.po_id}
+                >
+                  <input
+                    type="radio"
+                    name="purchase-order"
+                    value={candidate.po_id}
+                    checked={po === candidate.po_id}
+                    onChange={() => setPo(candidate.po_id)}
+                    required
+                  />
+                  <div>
+                    <strong>{candidate.po_number ?? 'Unavailable PO'}</strong>
+                    <small>
+                      {pretty(candidate.status)} · {candidate.currency ?? 'Currency unavailable'}
+                    </small>
+                  </div>
+                  <div>
+                    <span>Available now</span>
+                    <strong>{money(candidate.remaining_gross, candidate.currency ?? '')}</strong>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
           <div className="review-controls">
             <label>
               Next action
@@ -137,35 +180,6 @@ export default function ReviewForm({
               </label>
             )}
           </div>
-          {action === 'SELECT_PO' && (
-            <div className="po-options">
-              {review.options.map((candidate) => (
-                <label
-                  className={`po-option ${po === candidate.po_id ? 'selected' : ''}`}
-                  key={candidate.po_id}
-                >
-                  <input
-                    type="radio"
-                    name="purchase-order"
-                    value={candidate.po_id}
-                    checked={po === candidate.po_id}
-                    onChange={() => setPo(candidate.po_id)}
-                    required
-                  />
-                  <div>
-                    <strong>{candidate.po_number ?? 'Unavailable PO'}</strong>
-                    <small>
-                      {pretty(candidate.status)} · {candidate.currency ?? 'Currency unavailable'}
-                    </small>
-                  </div>
-                  <div>
-                    <span>Available now</span>
-                    <strong>{money(candidate.remaining_gross, candidate.currency ?? '')}</strong>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
           <label>
             Review rationale
             <textarea
@@ -178,9 +192,26 @@ export default function ReviewForm({
             />
           </label>
           <div className="review-submit">
-            <small>Credentials stay in memory. Your action is recorded permanently.</small>
+            <p className="review-revalidation">
+              <Icon name="info" size={17} />
+              {action === 'SELECT_PO'
+                ? 'Selection reruns validation. It does not approve the invoice.'
+                : 'Your response will be recorded. No payment is executed.'}
+            </p>
+            <small id="review-submit-help" className={ready ? 'sr-only' : ''}>
+              {!action
+                ? 'Choose a permitted action to continue.'
+                : !credential
+                  ? 'Enter the reviewer access token to continue.'
+                  : action === 'SELECT_PO' && !po
+                    ? 'Select a supporting purchase order and add your rationale.'
+                    : !reason.trim()
+                      ? 'Add your review rationale to continue.'
+                      : 'Ready to record this response.'}
+            </small>
             <button
               className="button"
+              aria-describedby="review-submit-help"
               disabled={
                 busy || !action || !credential || !reason.trim() || (action === 'SELECT_PO' && !po)
               }

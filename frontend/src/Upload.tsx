@@ -92,8 +92,7 @@ export default function Upload({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">DOCUMENT INTAKE</p>
-          <h1>Process Invoice</h1>
+          <h1>Submit invoice</h1>
           <p>Upload a PDF invoice to track its processing status and outcome.</p>
         </div>
       </div>
@@ -129,7 +128,7 @@ export default function Upload({
               <strong>{file ? file.name : 'Drop your invoice here'}</strong>
               <span>
                 {file ? (
-                  `${(file.size / 1024).toFixed(1)} KB · ready to upload`
+                  `${(file.size / 1024).toFixed(1)} KB · selected`
                 ) : (
                   <>
                     or <u>browse files</u> to choose a document
@@ -168,29 +167,36 @@ export default function Upload({
               className="button upload-submit"
               disabled={!file || !token || !limits || busy || !providerReady || !configurationReady}
             >
-              {busy ? 'Creating invoice run…' : 'Process invoice'}
+              {busy ? 'Uploading invoice…' : 'Submit invoice'}
               <Icon name="arrow" size={18} />
             </button>
             {!token && <p className="hint">Connect the workspace above to upload.</p>}
+            {token && !file && <p className="hint">Choose an invoice PDF to continue.</p>}
             {token && providerRequired && !providerReady && (
-              <p className="hint">Connect your OpenAI key and select a model before processing.</p>
+              <p className="hint">
+                Complete OpenAI connection setup and select a model to enable submission.
+              </p>
             )}
           </form>
         </section>
         <aside className="upload-explainer">
-          <h2>What happens after upload</h2>
-          <p>The background worker processes your invoice and records the outcome.</p>
+          <h2>After you submit</h2>
+          <p>Follow this invoice from upload to a recorded outcome in My invoices.</p>
           {[
-            ['file', 'Extract the printed facts', 'Preserve missing fields and original values.'],
+            [
+              'file',
+              'Document received',
+              'Your original PDF is stored with its processing record.',
+            ],
             [
               'shield',
-              'Verify against the source',
-              'Check evidence, arithmetic, vendor and PO rules.',
+              'Processing',
+              'The invoice is checked against source evidence and purchase records.',
             ],
             [
               'check',
-              'Approve or ask for review',
-              'No inferred PO, spending override or payment execution.',
+              'Outcome recorded',
+              'See the decision or information needed from financial review.',
             ],
           ].map(([icon, title, text]) => (
             <div className="explain-step" key={title}>

@@ -1,5 +1,17 @@
 # PS-1 implementation progress
 
+## Current: DM Sans and before-upload OpenAI instructions (2026-11-17)
+
+Applied the user's DM Sans selection as a pinned, locally bundled variable font, including the extended subset for ₹. Human-facing invoice/PO headings share the interface family; technical audit identifiers retain their existing mono treatment. Added ordered OpenAI connection/key/model instructions before personal-key submission, distinct missing-model/expired guidance, and truthful managed/mock instructions. Updated README, RUNNING.md and the credential guide to match the new navigation and remove the older blanket browser-key prohibition that conflicted with SPEC §3.5's authorized form.
+
+**14 shared/provider/workflow browser cases and 8 role cases passed**, including actual Latin/₹ webfont loading, desktop/mobile setup guidance, submission prerequisites, role isolation and unchanged review/resume. Frontend formatting/TypeScript/build pass; API contract hashes and backend source are unchanged. This follow-up did not rerun the backend suite; the prior 220-test backend result below remains a dated baseline. No live OpenAI call, configuration-secret change, commit, push or deployment. Existing uncommitted redesign work and all user workspaces/records are preserved.
+
+## Current: selected operational UI (2026-11-17, local review)
+
+Implemented the user-selected queue/detail direction within the existing React application: dedicated workspace entry before authentication, server-derived role navigation, My invoices as submitter landing, Review queue as reviewer landing even when empty, a separate OpenAI connection screen, original-PDF expansion, required review rationale and secondary evidence/audit disclosures. The app uses Invoice operations branding and has no assignment footer. Actual invoice/candidate data replaces reference-image examples; mock/replay provenance stays explicit. No backend, API, migration, financial policy, worker ownership or approval behavior changed.
+
+Verification: **220 backend tests passed, 3 opt-in live skips**; full migration roundtrip/parity is included. **14 shared/provider/workflow browser cases plus 8 role cases passed** at desktop/tablet/phone widths. Ruff (93 Python files), generated API hash comparison, frontend formatting/TypeScript/build passed. No live OpenAI calls. See [development details](docs/DEVELOPMENT.md) and [visual QA](design-qa.md). These changes are uncommitted and have not been pushed or deployed; prior public-deployment notes remain historical rather than evidence of this UI being hosted.
+
 ## Current: visible upload limits for Vercel (2026-11-14)
 
 The Vercel direct-upload demo now caps PDFs at **4 MiB**, while normal local/API defaults and the database ceiling remain **12 MiB**. Both profiles accept one to five unencrypted PDF pages. The frontend reads active limits from additive fields on GET /openai/config, displays them beside the file picker and rejects oversized selections; API intake enforces the same active boundary. No file-size guess is used when configuration is unavailable. Settings and Vercel startup cap enforcement prevent widening the hosted profile by mistake. No financial/worker/history change or new paid model call.

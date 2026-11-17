@@ -66,8 +66,7 @@ export default function History({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{queue ? 'EXCEPTION MANAGEMENT' : 'INVOICE REGISTER'}</p>
-          <h1>{queue ? 'Review Queue' : ownOnly ? 'My Invoices' : 'Invoice History'}</h1>
+          <h1>{queue ? 'Review queue' : ownOnly ? 'My invoices' : 'Invoice history'}</h1>
           <p>
             {queue
               ? 'The invoices that need your judgment, with the reason and next action.'
@@ -79,7 +78,7 @@ export default function History({
         {canUpload && (
           <Link to="?view=upload" navigate={navigate} className="button">
             <Icon name="upload" size={17} />
-            Process Invoice
+            Submit invoice
           </Link>
         )}
       </div>
@@ -211,7 +210,9 @@ export default function History({
                   ? 'Invoice records could not be loaded.'
                   : queue && !q
                     ? 'Your review queue is clear.'
-                    : 'No matching invoices.'}
+                    : q || state || decision
+                      ? 'No matching invoices.'
+                      : 'No invoices yet.'}
             </h3>
             <p>
               {!token
@@ -219,12 +220,12 @@ export default function History({
                 : q || state || decision
                   ? 'Change the search or filters to see more records.'
                   : canUpload
-                    ? 'Process an invoice to start a document and decision record.'
+                    ? 'Submit your first invoice to track its status and outcome.'
                     : 'Submitted invoices will appear here.'}
             </p>
             {canUpload && (
               <Link to="?view=upload" navigate={navigate} className="text-link">
-                Process Invoice <Icon name="arrow" size={16} />
+                Submit invoice <Icon name="arrow" size={16} />
               </Link>
             )}
           </div>

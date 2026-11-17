@@ -15,6 +15,10 @@ The user explicitly chose individual submitters seeing only their own invoices. 
 | Technical/financial audit screens | Hidden; limited submitter DTO | Allowed |
 | Demo scenario gallery | Hidden | Hidden |
 
+## Frontend navigation (17 November local update)
+
+Signed-out users see only the access entry screen. Submitters land on My invoices, with Submit invoice and OpenAI connection; reviewers land on Review queue, with Invoice history, Purchase orders and Overview. OpenAI connection is a frontend alias of the server upload capability, so a direct URL never grants finance access to submitter setup. The account control supports disconnect; refresh still requires reconnecting. The queue/detail layout and mobile navigation change presentation only. Public deployment has not been updated in this slice.
+
 ## Enforcement
 
 `GET /api/v1/access` returns a server-authenticated principal and allowed pages. APP_API_TOKEN is the default submitter identity; SUBMITTER_API_TOKENS adds individually named tokens; REVIEWER_API_TOKEN grants the configured finance role. A role or owner in a URL/form does not change identity. Role credentials must be unique, stable actor IDs must not be reused for different people, and configuration errors suppress sensitive inputs.

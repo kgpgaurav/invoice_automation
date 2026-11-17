@@ -1,6 +1,16 @@
-# Reviewer-supplied OpenAI keys: implementation record
+# Personal OpenAI connections: operating instructions and implementation record
 
 The user requested real extraction billed to each reviewer's supplied OpenAI project key, with account-accessible model selection. They chose authenticated-encrypted temporary server storage, expiring after 24 hours or explicit disconnect. SPEC §3.5 records this authorized extension; OpenAI remains the sole provider and Python remains the financial authority.
+
+## Current role-specific instructions (17 November UI update)
+
+The invoice **submitter** supplies the extraction key. The **financial reviewer** does not need one. The configuration spelling `OPENAI_CREDENTIAL_MODE=reviewer` and older evaluator wording below are retained for compatibility, not a finance-role requirement. Individual ownership/roles now follow SPEC ?4.1 and ROLE_ACCESS.md.
+
+Before adding a PDF, the submitter connects with their app token, opens **OpenAI connection**, enters **Your OpenAI API key**, clicks **Connect OpenAI**, and selects an **Invoice extraction model**. **Continue to submit invoice** then opens the PDF picker. A key alone without a selected model leaves **Submit invoice** disabled. The app token and OpenAI key are separate credentials. Financial reviewers use Review queue and their existing reviewer token without OpenAI setup.
+
+Connect once for multiple invoices in the same tab for up to 24 hours. Reconnect for new uploads after refresh/new tab/disconnect/expiry; use **Disconnect OpenAI** on the connection screen for explicit revocation. Already submitted runs retain their frozen binding. Mock/server-managed workspaces do not require a personal key; mock mode accepts its own generated PDFs and incurs no live extraction charges. See RUNNING.md for the correct workspace startup commands.
+
+The following dated implementation record describes the original shared-workspace extension and its measurements, not a claim that the new UI is deployed or that current role isolation is absent.
 
 ## Behavior and boundaries
 

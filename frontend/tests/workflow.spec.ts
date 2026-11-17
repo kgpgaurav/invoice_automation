@@ -15,7 +15,7 @@ const values = Object.fromEntries(
     }),
 );
 const live = process.env.PS1_BROWSER_LIVE === '1';
-const shots = resolve('..', 'docs', 'screenshots');
+const shots = resolve('..', 'output', 'playwright', 'regressions');
 let cleanRun = '';
 let heldRun = '';
 let selectedRun = '';
@@ -34,12 +34,12 @@ async function connect(page: Page) {
   await page.goto('/?view=history');
   await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Invoice History', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Invoice history', exact: true })).toBeVisible();
 }
 async function upload(page: Page, fixture: string) {
-  await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
+  await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
   await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, fixture + '.pdf'));
-  await page.getByRole('button', { name: 'Process invoice', exact: true }).click();
+  await page.getByRole('button', { name: 'Submit invoice', exact: true }).click();
   await expect(page).toHaveURL(/run=[a-f0-9-]{36}/);
 }
 async function approved(page: Page) {
@@ -51,7 +51,7 @@ async function approved(page: Page) {
 test.describe.serial('PDF-to-decision workspace', () => {
   test('H1 through upload, API, separate worker and database', async ({ page }) => {
     await connect(page);
-    await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
     await capture(page, {
       path: resolve(shots, live ? 'phase1-live-upload.png' : 'phase1-upload.png'),
       fullPage: true,
@@ -67,6 +67,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.getByRole('heading', { name: 'Processing timeline' })).toBeVisible();
     await expect(page.locator('.rule-check.passed')).toHaveCount(7);
     cleanRun = new URL(page.url()).searchParams.get('run')!;
+    await page.getByText('Extracted details', { exact: true }).click();
     await page.getByRole('button', { name: 'View Invoice Number source, page 1' }).click();
     await expect(page.getByRole('status')).toContainText('Showing page 1');
     await expect(page.getByRole('img', { name: 'Invoice PDF preview, page 1' })).toHaveAttribute(
@@ -101,7 +102,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     }
     expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
     await page.reload();
-    await expect(page.getByText('Connect to view this invoice.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connect to your workspace' })).toBeVisible();
     expect(new URL(page.url()).searchParams.get('run')).toBe(id);
   });
 
@@ -272,13 +273,13 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(page).toHaveURL(/view=review/);
-    await expect(page.getByRole('heading', { name: 'Review Queue', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review queue', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Review invoice' }).first()).toBeVisible();
     await capture(page, { path: resolve(shots, 'phase1-review-queue.png'), fullPage: true });
     await page.getByLabel('Search invoices').fill('Industrial');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.locator('tbody tr')).toHaveCount(1);
-    await page.getByRole('link', { name: 'Purchase Orders', exact: true }).click();
+    await page.getByRole('link', { name: 'Purchase orders', exact: true }).click();
     await page.getByRole('link', { name: 'PO-PARTIAL', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'PO-PARTIAL', exact: true })).toBeVisible();
     ledgerPO = new URL(page.url()).searchParams.get('po')!;
@@ -293,8 +294,8 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.getByText('Straight-through processing rate', { exact: true })).toBeVisible();
     await expect(page.getByText('DEMO DATA INCLUDED', { exact: true })).toBeVisible();
     await capture(page, { path: resolve(shots, 'phase1-overview.png'), fullPage: true });
-    await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
-    await page.getByRole('link', { name: 'Try a Scenario', exact: true }).last().click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Try a scenario', exact: true }).last().click();
     await expect(page.getByRole('button', { name: 'Use local PDF' })).toHaveCount(5);
     await expect(page.getByRole('button', { name: 'Fixture not available' })).toBeDisabled();
     await expect(page.getByText(/not independently repeatable yet/)).toBeVisible();
@@ -317,7 +318,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
         ['?view=purchase-orders', 'purchase-orders'],
         ['?po=' + ledgerPO, 'po-ledger'],
       ] as const) {
-        await page.getByRole('link', { name: 'Invoice History', exact: true }).focus();
+        await page.getByRole('link', { name: 'Invoice history', exact: true }).focus();
         await page.evaluate((path) => {
           history.pushState(null, '', path);
           dispatchEvent(new PopStateEvent('popstate'));
@@ -339,7 +340,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
           fullPage: true,
         });
       }
-      await page.getByRole('link', { name: 'Review Queue', exact: false }).first().focus();
+      await page.getByRole('link', { name: 'Review queue', exact: false }).first().focus();
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/view=review/);
     }
@@ -356,13 +357,13 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.locator('main')).toBeFocused();
     await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await page.getByRole('link', { name: 'Purchase Orders', exact: true }).focus();
+    await page.getByRole('link', { name: 'Purchase orders', exact: true }).focus();
     const outline = await page
-      .getByRole('link', { name: 'Purchase Orders', exact: true })
+      .getByRole('link', { name: 'Purchase orders', exact: true })
       .evaluate((el) => getComputedStyle(el).outlineWidth);
     expect(parseFloat(outline)).toBeGreaterThanOrEqual(3);
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Purchase Orders', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Purchase orders', exact: true })).toBeVisible();
     const contrasts = await page.evaluate(() => {
       const css = getComputedStyle(document.documentElement);
       const luminance = (hex: string) => {
@@ -415,7 +416,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.getByRole('status')).toContainText('Loading purchase orders');
     release();
     await expect(page.locator('tbody tr').first()).toBeVisible();
-    await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
     const unlabelled = await page
       .locator('input,select,textarea')
       .evaluateAll(
@@ -426,7 +427,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
           ).length,
       );
     expect(unlabelled).toBe(0);
-    await page.getByRole('link', { name: 'Invoice History', exact: true }).click();
+    await page.getByRole('link', { name: 'Invoice history', exact: true }).click();
     await page.getByLabel('Search invoices').fill('not-an-existing-invoice');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'No matching invoices.' })).toBeVisible();
@@ -437,7 +438,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
   }) => {
     test.skip(live, 'No personal documents or new live calls');
     await connect(page);
-    await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
     await expect(page.getByText(/Mock workspaces accept only/)).toBeVisible();
     await page.getByLabel('Invoice PDF').setInputFiles({
       name: 'unregistered-synthetic.pdf',
@@ -447,7 +448,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
         Buffer.from('\n% unregistered synthetic test variant\n'),
       ]),
     });
-    await page.getByRole('button', { name: 'Process invoice', exact: true }).click();
+    await page.getByRole('button', { name: 'Submit invoice', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Processing could not complete', exact: true }),
     ).toBeVisible();
@@ -469,7 +470,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     expect(detail.decision).toBeNull();
     expect(detail.approved_gross).toBeNull();
     await capture(page, { path: resolve(shots, 'mock-unsupported-pdf.png'), fullPage: true });
-    await page.getByRole('link', { name: 'Invoice History', exact: true }).click();
+    await page.getByRole('link', { name: 'Invoice history', exact: true }).click();
     await expect(page.locator('tbody tr').first()).toContainText(
       'does not match a prepared mock-demo invoice',
     );

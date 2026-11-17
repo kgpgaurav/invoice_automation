@@ -19,7 +19,9 @@
   --failed-bg: #f4edf5;
   --radius: 8px;
   --focus: #435c91;
-  font-family: 'Segoe UI', Inter, Arial, sans-serif;
+  --font-ui: 'DM Sans Variable', 'Segoe UI', Arial, sans-serif;
+  font-family: var(--font-ui);
+  font-optical-sizing: auto;
   font-synthesis: none;
   font-size: 14px;
   line-height: 1.5;

@@ -36,6 +36,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/?view=upload');
   await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await page.getByRole('link', { name: 'OpenAI connection', exact: true }).click();
 });
 
 test('reviewer key, explicit model and disconnect; upload stopped before processing', async ({
@@ -51,13 +52,47 @@ test('reviewer key, explicit model and disconnect; upload stopped before process
     disconnected = true;
     await route.fulfill({ status: 204 });
   });
+  await expect(page.getByRole('heading', { name: 'Before adding an invoice' })).toBeVisible();
+  await expect(page.getByLabel('Before adding an invoice').getByRole('listitem')).toHaveCount(3);
+  const fontFaces = await page.evaluate(async () => {
+    const faces = await document.fonts.load('400 14px "DM Sans Variable"', 'Invoice ₹11,800.00');
+    return faces.filter((face) => face.status === 'loaded').length;
+  });
+  expect(fontFaces).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('body')).toHaveCSS('font-family', /DM Sans Variable/);
+  await page.screenshot({
+    path: resolve('..', 'output', 'playwright', 'dm-sans-key-setup.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: resolve('..', 'output', 'playwright', 'dm-sans-key-setup-mobile.png'),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('link', { name: 'Submit invoice', exact: true }).click();
+  await expect(page.getByLabel('Extraction connection')).toContainText(
+    'Add your OpenAI API key first',
+  );
+  await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, 'H1.pdf'));
+  await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeDisabled();
+  await page.getByRole('link', { name: 'Set up connection', exact: true }).click();
   await page.getByLabel('Your OpenAI API key').fill(key);
   await page.getByRole('button', { name: 'Connect OpenAI', exact: true }).click();
   await expect(page.getByLabel('Invoice extraction model')).toHaveValue('');
   await expect(page.getByLabel('Your OpenAI API key')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Submit invoice', exact: true }).click();
+  await expect(page.getByLabel('Extraction connection')).toContainText(
+    'Select a model before adding an invoice',
+  );
   await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, 'H1.pdf'));
-  await expect(page.getByRole('button', { name: 'Process invoice', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeDisabled();
+  await page.getByRole('link', { name: 'OpenAI connection', exact: true }).click();
   await page.getByLabel('Invoice extraction model').selectOption('gpt-6-luna');
+  await page.getByRole('link', { name: 'Submit invoice', exact: true }).click();
+  await expect(page.getByLabel('Extraction connection')).toContainText('OpenAI connection ready');
+  await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, 'H1.pdf'));
   await page.route('**/invoices/process', async (route) => {
     expect(route.request().headers()['x-openai-session']).toBe(connection.session_token);
     expect(route.request().postData()).toContain('gpt-6-luna');
@@ -67,9 +102,10 @@ test('reviewer key, explicit model and disconnect; upload stopped before process
       json: { detail: 'UI-only test stopped before processing.' },
     });
   });
-  await page.getByRole('button', { name: 'Process invoice', exact: true }).click();
+  await page.getByRole('button', { name: 'Submit invoice', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('UI-only test stopped');
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  await page.getByRole('link', { name: 'OpenAI connection', exact: true }).click();
   await page.getByRole('button', { name: 'Disconnect OpenAI', exact: true }).click();
   await expect(page.getByLabel('Your OpenAI API key')).toBeVisible();
   expect(disconnected).toBe(true);
@@ -94,10 +130,10 @@ test('a late connection response is revoked after leaving setup', async ({ page 
   await page.getByLabel('Your OpenAI API key').fill(key);
   await page.getByRole('button', { name: 'Connect OpenAI', exact: true }).click();
   await expect.poll(() => received).toBe(true);
-  await page.getByRole('link', { name: 'Invoice History', exact: true }).click();
+  await page.getByRole('link', { name: 'Invoice history', exact: true }).click();
   release?.();
   await expect.poll(() => revoked).toBe(true);
-  await page.getByRole('link', { name: 'Process Invoice', exact: true }).first().click();
+  await page.getByRole('link', { name: 'OpenAI connection', exact: true }).click();
   await expect(page.getByLabel('Your OpenAI API key')).toBeVisible();
   await expect(page.getByLabel('Invoice extraction model')).toHaveCount(0);
 });
@@ -113,6 +149,11 @@ for (const mib of [4, 12]) {
     await page.reload();
     await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
+    await expect(page.getByLabel('Extraction connection')).toContainText(
+      'Workspace-managed extraction',
+    );
+    await expect(page.getByLabel('Your OpenAI API key')).toHaveCount(0);
     await expect(page.locator('#upload-limits')).toContainText(`up to ${mib} MiB`);
     await expect(page.locator('#upload-limits')).toContainText('1–5 pages, unencrypted');
     const original = readFileSync(resolve(directory, 'H1.pdf'));
@@ -122,14 +163,14 @@ for (const mib of [4, 12]) {
       .getByLabel('Invoice PDF')
       .setInputFiles({ name: 'over.pdf', mimeType: 'application/pdf', buffer: oversized });
     await expect(page.getByRole('alert')).toContainText(`at most ${mib} MiB`);
-    await expect(page.getByRole('button', { name: 'Process invoice', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeDisabled();
     await page.getByLabel('Invoice PDF').setInputFiles({
       name: 'boundary.pdf',
       mimeType: 'application/pdf',
       buffer: oversized.subarray(0, limit),
     });
     await expect(page.getByRole('alert')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Process invoice', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeEnabled();
     // Only selection is checked here; no POST, extraction or provider charge is started.
   });
 }

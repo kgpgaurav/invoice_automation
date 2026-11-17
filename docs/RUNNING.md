@@ -1,5 +1,21 @@
 # Run the invoice workspace locally
 
+## Current app: connect OpenAI before adding an invoice
+
+The updated UI uses locally bundled **DM Sans** and a dedicated workspace-access screen. Its current flow is:
+
+1. Enter your assigned **Workspace access token** and click **Connect**. Submitters land on **My invoices**; financial reviewers land on **Review queue**.
+2. For personal-key extraction, open **OpenAI connection**, enter **Your OpenAI API key**, then click **Connect OpenAI**.
+3. Select an **Invoice extraction model**. A connected key without a selected model cannot enable submission.
+4. Click **Continue to submit invoice**, choose your PDF and click **Submit invoice**. The active size/page limits are displayed beside the picker.
+5. Track the saved outcome in **My invoices**. A reviewer handles exceptions through the queue/detail panel and **Confirm selection & resume**; PO selection revalidates and is not approval.
+
+One personal connection can serve multiple invoices in the same tab until expiry (maximum 24 hours), disconnect or refresh/new-tab loss of the tab capability. Reconnect for new uploads when needed; submitted jobs retain their original encrypted binding. Use **Disconnect OpenAI** on the connection screen to revoke it. Use the sidebar account control (user icon on a phone) ? **Disconnect** to leave the app.
+
+The local `ui-design-*` preview and `--mode mock` demos are **mock extraction**: use their generated PDFs, with no personal OpenAI key or live provider charge. Their connection screen says **Managed by your workspace**, and the upload screen says **Workspace-managed extraction**. To use the personal-key screen, use the role-separated `--mode reviewer --roles` workspace below. Do not change an existing mock workspace's mode or replace its configuration with `.local/deployment.env`.
+
+After pulling changes, run `npm.cmd ci` from **frontend**, then restart Vite and refresh the page. This installs the bundled DM Sans assets; the browser does not need a Google Fonts connection. Existing backend dependencies/configuration are unchanged by the font/guidance update.
+
 ## Individual submitters and financial reviewer
 
 Use the role-separated workspace for personal invoice access. From backend in CMD, create it once if it does not already exist:
@@ -22,10 +38,10 @@ Keep the frontend on http://127.0.0.1:5173 and refresh. The operator opens `.loc
 
 | Credential | Identity and allowed screens |
 |---|---|
-| APP_API_TOKEN | First submitter (`submitter`): Process Invoice, My Invoices, their own status/source/usage |
+| APP_API_TOKEN | First submitter (`submitter`): My invoices, Submit invoice, OpenAI connection, their own status/source/usage |
 | Value for `submitter-b` inside SUBMITTER_API_TOKENS JSON | Second submitter: same screens, separate invoice history |
 | Value for `submitter-c` inside SUBMITTER_API_TOKENS JSON | Third submitter: same screens, separate invoice history |
-| REVIEWER_API_TOKEN | Financial reviewer: Review Queue, workspace Invoice History, Purchase Orders and Overview; no upload or OpenAI key form |
+| REVIEWER_API_TOKEN | Financial reviewer: Review queue, workspace Invoice history, Purchase orders and Overview; no upload or OpenAI key form |
 
 The server determines the role; there is no permission-granting role dropdown. In role mode, the reviewer signs in once using the reviewer credential and does not re-enter it in each review form. Only submitters connect their OpenAI key/model before live upload. The internal configuration name `OPENAI_CREDENTIAL_MODE=reviewer` is retained from the evaluator-key feature; it does not mean that a financial reviewer needs an OpenAI key.
 
@@ -39,7 +55,7 @@ Existing shared-mode demos retain their earlier broad workspace visibility for c
 
 Browser role checks: from backend, `uv run python -m scripts.browser_checks --roles --api-port 8100 --ui-port 5273`. This creates its own mock-extraction role workspace, verifies two-person isolation and authorized review/resume, then removes only its test schemas/processes. It makes no live OpenAI calls. Shared-mode regressions use the same command without `--roles`.
 
-## Reviewers use their own OpenAI key and model
+## Shared compatibility workspace with a personal OpenAI key
 
 Create a separate local workspace once, from backend in CMD:
 
@@ -60,7 +76,7 @@ uv run python -m scripts.demo api --name local-reviewer
 uv run python -m scripts.demo worker --name local-reviewer --enable-processing
 ```
 
-Keep the frontend on http://127.0.0.1:5173. Connect using APP_API_TOKEN from `.local/demos/local-reviewer/backend.env`, open Process Invoice, enter your **OpenAI API key** in **Your OpenAI connection**, and select an offered model. Workspace/reviewer tokens and the OpenAI key are three different credentials. The offered models are the intersection of the key's Models API result and the app-tested `gpt-6-luna` / `gpt-6.1-terra` list. Listing alone does not establish Responses permission, available credit or financial correctness. Uploading an invoice explicitly starts paid extraction under the supplied key. Reviewer mode never uses an operator-key fallback.
+Keep the frontend on http://127.0.0.1:5173. Connect using APP_API_TOKEN from `.local/demos/local-reviewer/backend.env`, open **OpenAI connection**, enter **Your OpenAI API key**, click **Connect OpenAI**, and select an **Invoice extraction model**. Then use **Continue to submit invoice** to add the PDF. Workspace/reviewer tokens and the OpenAI key are three different credentials. The offered models are the intersection of the key's Models API result and the app-tested `gpt-6-luna` / `gpt-6.1-terra` list. Listing alone does not establish Responses permission, available credit or financial correctness. Uploading an invoice explicitly starts paid extraction under the supplied key. Reviewer mode never uses an operator-key fallback.
 
 Keys are encrypted in the database with access expiring after 24 hours. **Disconnect OpenAI**, or workspace Disconnect, revokes the session and erases its active ciphertext; in-flight calls can finish and incur charges. The key and opaque connection are not saved in browser storage. Reload requires reconnecting; merely closing/reloading the tab is not guaranteed to revoke an already submitted server session. Existing queued jobs retain their original binding until expiry/revocation. Changing model affects new runs only. A failed expired-key run retains the PDF and can be submitted as a new run after reconnecting; no automatic paid resubmission occurs.
 
@@ -102,9 +118,9 @@ Browser regressions can run alongside your current app without taking its ports:
 
 Phase 1 UI update (2026-11-13): follow the startup commands below unchanged. First complete the operator credential-rotation steps in [SECURITY.md](SECURITY.md) if the previous ZIP contained your .env. No key rotation is claimed by this repository change. Local demonstration credentials and the OpenAI key are separate; copy only the intended application/reviewer credential into its input.
 
-After connecting, `/` opens Review Queue when actual review items exist, otherwise Overview. Navigation provides Review Queue, Process Invoice, Invoice History, Purchase Orders and Overview. Uploads start from **Process Invoice**, then **Process invoice** in the upload form. The reviewer form requires **Review rationale**, the separate reviewer credential and one of the backend-permitted actions. Changing a screen or navigation item grants no authorization.
+The 17 November local UI update opens a dedicated access screen before showing workspace content. After connecting at `/`, submitters land on **My invoices** and reviewers on **Review queue**, including when empty. Submitters have **Submit invoice** and **OpenAI connection**; finance has **Invoice history**, **Purchase orders** and **Overview**. Shared compatibility mode retains its additional tools. The reviewer form requires **Review rationale** and one of the backend-permitted actions; role-mode finance uses the credential already verified, while shared mode still requires the separate reviewer credential. Changing a screen or navigation item grants no authorization.
 
-Open an invoice to inspect the decision, recorded rule checklist and assessment-time balance breakdown for an overrun. Unrecorded individual checks remain **Not evaluated**. A clean approval's passed checks are certified by its committed VALIDATED assessment and ledger; these are not newly invented check-execution logs. Expand the supporting record to inspect provenance and revision. Verified field-page buttons navigate the original PDF; precise highlights remain unavailable. Tablet/mobile content stacks; wide data tables scroll inside their labelled region.
+Open an invoice to inspect the decision, recorded rule checklist and assessment-time balance breakdown for an overrun. Unrecorded individual checks remain **Not evaluated**. A clean approval's passed checks are certified by its committed VALIDATED assessment and ledger; these are not newly invented check-execution logs. Expand the supporting record to inspect provenance and revision. Verified field-page buttons navigate the original PDF; precise highlights remain unavailable. The reviewer queue uses adjacent list/detail panels on desktop and a list-to-detail flow on tablet/phone. Use **Back to review queue**, browser Back/Forward or the preserved queue-selection URL to navigate. **Expand PDF** opens the original document in a modal; Escape closes it and restores focus. Extracted details and audit records remain secondary disclosures. Wide history/PO tables scroll inside their labelled region.
 
 **Inspect PO ledger** opens read-only current PO data plus immutable approved-invoice allocations. Historical assessment balances remain on the invoice; today's cap does not rewrite them. The scenario gallery explains local PDFs and predecessor dependencies; it cannot seed, reset, download private files or execute cases. H2 is explicitly unavailable. See [Phase 1 handoff](PHASE1.md) for the exact changes, screenshots and verification limits.
 
@@ -146,7 +162,7 @@ npm.cmd ci
 npm.cmd run dev
 ```
 
-Open http://127.0.0.1:5173. Open .local/demos/local/backend.env **locally in your editor**, copy APP_API_TOKEN into **Workspace access token**, and connect. Use REVIEWER_API_TOKEN only in the review panel's separate reviewer field. Never put OPENAI_API_KEY in the browser, chat, VITE variables, URL or localStorage. Credentials are held only in tab memory; refreshing preserves the run URL but requires reconnecting.
+Open http://127.0.0.1:5173. Open .local/demos/local/backend.env **locally in your editor**, copy APP_API_TOKEN into **Workspace access token**, and connect. Use REVIEWER_API_TOKEN only in the review panel's separate reviewer field. This shared mock profile needs no personal OpenAI key. In a personal-key workspace, enter a key only in the authenticated **OpenAI connection** password field. Never put it in the workspace-token input, chat, VITE variables, URLs or browser storage; managed server credentials remain server-only. Credentials are held only in tab memory; refreshing preserves the run URL but requires reconnecting.
 
 Upload the generated PDFs through the UI in this order:
 
@@ -188,6 +204,6 @@ uv run python -m scripts.browser_checks
 uv run python -m scripts.browser_checks --live-h1
 ```
 
-The browser runner requires ports 8000 and 5173 available. On Windows it uses installed Edge; set PS1_BROWSER_CHANNEL=chrome for installed Chrome. On other systems install Playwright Chromium (`npx playwright install chromium` from frontend). Logs, credentials and traces stay under ignored .local/test-results; sanitized synthetic screenshots are in docs/screenshots. If a test fails, inspect the private per-demo playwright.log; do not share credential files or raw traces.
+The browser runner requires ports 8000 and 5173 available. On Windows it uses installed Edge; set PS1_BROWSER_CHANNEL=chrome for installed Chrome. On other systems install Playwright Chromium (`npx playwright install chromium` from frontend). Private demo logs/credentials stay under ignored `.local/demos`; Playwright traces/results stay under ignored `frontend/test-results`, with screenshot intermediates in `output/playwright`. Accepted synthetic screenshots are in `docs/screenshots`. If a test fails, inspect the private per-demo playwright.log; do not share credential files or raw traces.
 
 Frontend checks from frontend: `npm.cmd run generate:api`, `npm.cmd run build`, `npm.cmd run format:check`. Generated API files are never edited manually. Deployment topology and its unvalidated hosting/container boundary are documented in DEPLOYMENT.md. Default `python -m app.worker` remains disabled; none of these instructions provisions or exposes paid services.

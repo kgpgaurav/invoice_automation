@@ -30,6 +30,7 @@ export default function OpenAIConnection({
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const active = useRef(true);
+  const pending = useRef(false);
   useEffect(() => {
     active.current = true;
     return () => {
@@ -38,6 +39,8 @@ export default function OpenAIConnection({
   }, []);
   async function connect(e: FormEvent) {
     e.preventDefault();
+    if (pending.current || !key.trim()) return;
+    pending.current = true;
     setBusy(true);
     setError('');
     try {
@@ -51,11 +54,14 @@ export default function OpenAIConnection({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      pending.current = false;
       setKey('');
       setBusy(false);
     }
   }
   async function disconnect() {
+    if (pending.current) return;
+    pending.current = true;
     setBusy(true);
     setError('');
     try {
@@ -64,6 +70,7 @@ export default function OpenAIConnection({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
@@ -79,8 +86,31 @@ export default function OpenAIConnection({
         re-enter the key for each invoice. Reconnect for new uploads after refreshing, opening a new
         tab, disconnecting or expiry.
       </p>
+      {!connection && (
+        <section className="connection-instructions" aria-label="Before adding an invoice">
+          <h3>Before adding an invoice</h3>
+          <ol>
+            <li>
+              Enter your own <strong>OpenAI API key</strong> below and click{' '}
+              <strong>Connect OpenAI</strong>.
+            </li>
+            <li>
+              Choose an <strong>Invoice extraction model</strong> from the models offered for your
+              key.
+            </li>
+            <li>
+              Click <strong>Continue to submit invoice</strong>, then choose your PDF and submit it.
+            </li>
+          </ol>
+        </section>
+      )}
       {connection ? (
         <>
+          <p role="status">
+            {connection.model
+              ? 'Key and model selected. Continue to submit invoice to add your PDF.'
+              : 'Key connected. Select an Invoice extraction model before adding your PDF.'}
+          </p>
           <label htmlFor="openai-model">Invoice extraction model</label>
           <select
             id="openai-model"
@@ -126,12 +156,16 @@ export default function OpenAIConnection({
           </button>
         </form>
       )}
-      <p className="hint">
-        The server temporarily encrypts your key for up to 24 hours. Disconnect erases it and blocks
-        new calls; already dispatched calls may finish and be charged. Closing or refreshing the tab
-        does not revoke the connection used by submitted runs. Your key is not saved in browser
-        storage. Only account-listed models supported by this invoice pipeline are offered.
-      </p>
+      <details className="provider-security">
+        <summary>Key security and billing</summary>
+        <p>
+          The server temporarily encrypts your key for up to 24 hours. Disconnect erases it and
+          blocks new calls; already dispatched calls may finish and be charged. Closing or
+          refreshing the tab does not revoke the connection used by submitted runs. Your key is not
+          saved in browser storage. Only account-listed models supported by this invoice pipeline
+          are offered.
+        </p>
+      </details>
       {error && (
         <div className="error" role="alert">
           {error}

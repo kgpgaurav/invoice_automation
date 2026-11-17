@@ -88,25 +88,27 @@ export default function PDFPreview({
   }, [document, page, width]);
   return (
     <div className="pdf-preview" ref={container}>
-      <div className="pdf-toolbar">
-        <button
-          className="button quiet small"
-          disabled={!document || page <= 1}
-          onClick={() => setPage((n) => n - 1)}
-        >
-          Previous page
-        </button>
-        <span>
-          Page {page} / {document?.numPages ?? '—'}
-        </span>
-        <button
-          className="button quiet small"
-          disabled={!document || page >= document.numPages}
-          onClick={() => setPage((n) => n + 1)}
-        >
-          Next page
-        </button>
-      </div>
+      {document?.numPages !== 1 && (
+        <div className="pdf-toolbar">
+          <button
+            className="button quiet small"
+            disabled={!document || page <= 1}
+            onClick={() => setPage((n) => n - 1)}
+          >
+            Previous page
+          </button>
+          <span>
+            Page {page} / {document?.numPages ?? '—'}
+          </span>
+          <button
+            className="button quiet small"
+            disabled={!document || page >= document.numPages}
+            onClick={() => setPage((n) => n + 1)}
+          >
+            Next page
+          </button>
+        </div>
+      )}
       {error && (
         <div className="error" role="alert">
           {error}

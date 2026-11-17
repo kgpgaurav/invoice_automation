@@ -49,12 +49,11 @@ export default function PurchaseOrders({
         <div>
           {poId && (
             <Link to="?view=purchase-orders" navigate={navigate} className="back-link">
-              ← All Purchase Orders
+              ← All Purchase orders
             </Link>
           )}
-          <p className="eyebrow">READ-ONLY FINANCIAL REGISTER</p>
           <h1 className={po ? 'mono' : ''}>
-            {po?.po_number ?? (poId ? 'Purchase order ledger' : 'Purchase Orders')}
+            {po?.po_number ?? (poId ? 'Purchase order ledger' : 'Purchase orders')}
           </h1>
           <p>
             {po?.vendor_name ?? 'Inspect authorized funds and their immutable invoice allocations.'}

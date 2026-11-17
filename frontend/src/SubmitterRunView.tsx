@@ -84,11 +84,10 @@ export default function SubmitterRunView({
   return (
     <>
       <Link to="?view=history" navigate={navigate}>
-        ← Back to My Invoices
+        ← Back to My invoices
       </Link>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">MY INVOICE</p>
           <h1>{run?.invoice_number ?? 'Invoice status'}</h1>
           <p>Run {runId.slice(0, 8)}</p>
         </div>

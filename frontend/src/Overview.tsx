@@ -23,7 +23,6 @@ export default function Overview({ token, navigate }: { token: string; navigate:
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">OPERATIONS AT A GLANCE</p>
           <h1>Overview</h1>
           <p>
             Routine invoices move forward. Exceptions arrive with the reason and supporting numbers.
@@ -76,7 +75,7 @@ export default function Overview({ token, navigate }: { token: string; navigate:
                 <p>Recorded runs, with explicit measurement coverage.</p>
               </div>
               <Link to="?view=review" navigate={navigate} className="text-link">
-                Open Review Queue →
+                Open Review queue →
               </Link>
             </div>
             <dl className="overview-measures">

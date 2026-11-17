@@ -17,6 +17,7 @@ import ReviewForm from './ReviewForm';
 import InvoiceDecision from './InvoiceDecision';
 import RuleChecklist from './RuleChecklist';
 import BusinessTimeline from './BusinessTimeline';
+import ReviewDetail from './ReviewDetail';
 const PDFPreview = lazy(() => import('./PDFPreview'));
 
 export default function RunView({
@@ -25,12 +26,14 @@ export default function RunView({
   navigate,
   notify,
   reviewerToken,
+  embedded = false,
 }: {
   runId: string;
   token: string;
   navigate: Navigate;
   notify: (s: string) => void;
   reviewerToken?: string;
+  embedded?: boolean;
 }) {
   const [run, setRun] = useState<Run | null>(null),
     [events, setEvents] = useState<RunEvent[]>([]),
@@ -154,6 +157,31 @@ export default function RunView({
     setSourceNotice(`Showing page ${page} for ${fieldTitle(field)}.`);
     document.getElementById('source-document')?.scrollIntoView({ block: 'start' });
   }
+  function submitted() {
+    notify('Review recorded. Processing will revalidate the financial requirements.');
+    setReview(null);
+    setStreamVersion((n) => n + 1);
+    void refreshRef.current();
+    dispatchEvent(new Event('ps1:record-updated'));
+  }
+  if (embedded)
+    return (
+      <ReviewDetail
+        run={run}
+        runId={runId}
+        events={events}
+        review={review}
+        pdf={pdf}
+        pdfError={pdfError}
+        error={error}
+        refresh={() => void refreshRef.current()}
+        submitted={submitted}
+        notify={notify}
+        reviewerToken={reviewerToken}
+        navigate={navigate}
+        connection={connection}
+      />
+    );
   return (
     <>
       <div className="page-heading run-heading">
@@ -161,7 +189,6 @@ export default function RunView({
           <Link to="?view=history" navigate={navigate} className="back-link">
             ← Back to Invoice History
           </Link>
-          <p className="eyebrow">INVOICE WORKSPACE</p>
           <h1 className="mono">{run?.invoice_number ?? 'Invoice details'}</h1>
           <p className="run-ident">Run {runId}</p>
         </div>
@@ -303,19 +330,12 @@ export default function RunView({
                   review={review}
                   reasonCode={run.reason_code}
                   onRefresh={() => void refreshRef.current()}
-                  onSubmitted={() => {
-                    notify(
-                      'Review recorded. Resume is queued; financial requirements will be revalidated.',
-                    );
-                    setReview(null);
-                    setStreamVersion((n) => n + 1);
-                    void refreshRef.current();
-                  }}
+                  onSubmitted={submitted}
                   notify={notify}
                 />
               )}
               <section className="panel fields-panel">
-                <details open>
+                <details>
                   <summary className="panel-heading">
                     <h2>Extracted details</h2>
                     <span className="muted">Source status & page links</span>
