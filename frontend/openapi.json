@@ -1551,6 +1551,12 @@
             ],
             "title": "Mode"
           },
+          "mock_mode": {
+            "type": "boolean",
+            "title": "Mock Mode",
+            "description": "Explicit mock-demo presentation flag; does not enable processing.",
+            "default": false
+          },
           "supported_models": {
             "items": {
               "type": "string"

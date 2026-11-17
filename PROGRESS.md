@@ -1,12 +1,20 @@
 # PS-1 implementation progress
 
-## Current: DM Sans and before-upload OpenAI instructions (2026-11-17)
+## Current: deployment status and contextual upload/queue copy (2026-11-18)
+
+The redesign/DM Sans baseline is committed and pushed as `1c161af`. Read-only public checks confirm the redesigned entry screen, loaded DM Sans and HTTP 200 for the app, health, readiness and upload configuration. README, deployment instructions and visual QA now distinguish published UI/API readiness from still-unverified hosted worker/master-data/processing gates.
+
+Normal upload omits mock instructions, the managed-connection banner and worker-operation wording. Explicit mock demos advertise a new non-secret `mock_mode` boolean through the existing configuration response; only true shows the sample-PDF note. This presentation flag does not enable processing. Legacy responses remain compatible; malformed metadata keeps upload disabled with a persistent explanation. Personal-key/model prerequisites and recorded source provenance remain intact. Ambiguous PO matches say **Choose purchase order**; missing matches retain **Missing PO**.
+
+**225 backend tests passed, 3 opt-in live skips; 18 shared/provider/workflow and 9 role browser cases passed.** Ruff, migration roundtrip/parity regressions, reproducible API generation, frontend formatting/TypeScript/build pass. A newly exposed disappearing configuration-error message was fixed before the full browser rerun. See [development details](docs/DEVELOPMENT.md) and [visual evidence](design-qa.md). No live OpenAI call, secret edit, migration or financial/worker behavior change. This follow-up remains uncommitted, without push or deployment; the already-published baseline is separate.
+
+## Historical: DM Sans and before-upload OpenAI instructions (2026-11-17)
 
 Applied the user's DM Sans selection as a pinned, locally bundled variable font, including the extended subset for ₹. Human-facing invoice/PO headings share the interface family; technical audit identifiers retain their existing mono treatment. Added ordered OpenAI connection/key/model instructions before personal-key submission, distinct missing-model/expired guidance, and truthful managed/mock instructions. Updated README, RUNNING.md and the credential guide to match the new navigation and remove the older blanket browser-key prohibition that conflicted with SPEC §3.5's authorized form.
 
 **14 shared/provider/workflow browser cases and 8 role cases passed**, including actual Latin/₹ webfont loading, desktop/mobile setup guidance, submission prerequisites, role isolation and unchanged review/resume. Frontend formatting/TypeScript/build pass; API contract hashes and backend source are unchanged. This follow-up did not rerun the backend suite; the prior 220-test backend result below remains a dated baseline. No live OpenAI call, configuration-secret change, commit, push or deployment. Existing uncommitted redesign work and all user workspaces/records are preserved.
 
-## Current: selected operational UI (2026-11-17, local review)
+## Historical: selected operational UI (2026-11-17, local review)
 
 Implemented the user-selected queue/detail direction within the existing React application: dedicated workspace entry before authentication, server-derived role navigation, My invoices as submitter landing, Review queue as reviewer landing even when empty, a separate OpenAI connection screen, original-PDF expansion, required review rationale and secondary evidence/audit disclosures. The app uses Invoice operations branding and has no assignment footer. Actual invoice/candidate data replaces reference-image examples; mock/replay provenance stays explicit. No backend, API, migration, financial policy, worker ownership or approval behavior changed.
 

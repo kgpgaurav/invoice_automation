@@ -2,7 +2,7 @@
 
 **Version:** `0.2-draft`  
 **Date:** 2026-11-11  
-**Status:** Architecture baseline, **not yet implemented or empirically validated**  
+**Status:** Canonical architecture contract; current implementation and verification status is recorded in README.md and docs/DEVELOPMENT.md<br>
 **Owner:** Project team  
 **Authority:** This file supersedes the earlier five planning documents when they disagree. Those documents are background/reference drafts, not separate implementation contracts.
 
@@ -18,7 +18,7 @@ The hiring brief requires a live end-to-end process, a visible execution view, a
 
 **Working stack:** React + Vite + TypeScript + Tailwind/shadcn/ui; FastAPI + Pydantic v2 + SQLAlchemy/Alembic; LangGraph + Postgres checkpointer; PostgreSQL for business data, durable work queue and events; PyMuPDF for PDF text/evidence; OpenAI Responses API + Structured Outputs; SSE with polling fallback; Pytest. Default deploy: always-on hosted API + managed PostgreSQL + static frontend. Lock a specific provider only after checking sleeping/instance and persistent-storage behavior.
 
-Deployment target clarification (2026-11-14, explicitly requested): prepare the private demonstration for Vercel Hobby frontend/FastAPI Services plus a separate persistent worker Daemon and external session-preserving PostgreSQL. The worker/financial contracts remain unchanged. The Vercel direct-upload demo profile permits at most **4 MiB (4,194,304 bytes)**, allowing room for multipart overhead below the platform's request cap; the normal local/API default and database ceiling remain **12 MiB**. Both profiles require an unencrypted one-to-five-page PDF. Existing GET /openai/config exposes active max_pdf_bytes/max_pdf_pages, and frontend notes/validation follow those values. This profile is not deployed or verified on the provider; database, free quotas and hosted acceptance remain open. See docs/DEPLOYMENT.md for the gates and historical Render status.
+Deployment target clarification (2026-11-14, explicitly requested): use Vercel Hobby frontend/FastAPI Services plus a separate persistent worker Daemon and external session-preserving PostgreSQL. The worker/financial contracts remain unchanged. The Vercel direct-upload demo profile permits at most **4 MiB (4,194,304 bytes)**, allowing room for multipart overhead below the platform's request cap; the normal local/API default and database ceiling remain **12 MiB**. Both profiles require an unencrypted one-to-five-page PDF. Existing GET /openai/config exposes active max_pdf_bytes/max_pdf_pages, and frontend notes/validation follow those values. Status update (2026-11-18): the frontend/API are deployed with Supabase PostgreSQL; public entry/font/health/readiness/configuration checks pass. Worker activation, hosted invoice/recovery acceptance, ingress boundaries and free quotas remain separate verification gates. See docs/DEPLOYMENT.md for their scope and historical Render status.
 
 ---
 
@@ -242,6 +242,8 @@ Intake atomically freezes the credential reference and selected model with the P
 
 Add authenticated `POST /api/v1/openai/sessions` and `DELETE /api/v1/openai/session`, plus a non-secret `GET /api/v1/openai/config`. Reviewer-mode intake requires the opaque `X-OpenAI-Session` header and multipart `model_id`; existing server-mode intake remains compatible. Routine verification uses mocked OpenAI transport, not billable model calls.
 
+Presentation metadata clarification (2026-11-18): `/openai/config` also returns non-secret `mock_mode: bool` (default false). Only the explicit mock demo launcher sets it true from its trusted workspace metadata. It does not select a processor, enable processing, alter provenance or change financial decisions. The frontend shows sample-PDF/mock upload instructions only for an explicitly true flag; older API responses without it omit that note without claiming a live model call. The existing `mode` field continues to describe credentials only.
+
 ## 3.6 Failure fallback / replay mode (transparent)
 
 - **Normal demo:** real API request and genuinely executing stages; verify OpenAI billing/key and hosting immediately before interview.
@@ -332,6 +334,8 @@ Typography/setup clarification (2026-11-17, explicitly requested): use locally b
 5. **Should-have UI:** typed tolerance editor (creates a new policy version), explicit re-evaluation run, and locally grounded PDF highlighting.
 
 Use SSE for live updates and polling fallback. Every displayed processing stage derives from persisted backend events, **never arbitrary client timers**. A plain-English reason is mandatory on approve, review and reject.
+
+Upload/queue copy clarification (2026-11-18): normal intake omits mock-only instructions and worker-operation terminology. Technical availability checks remain in operator docs and actual failure diagnostics. Queue reason `PO_AMBIGUOUS` displays **Choose purchase order**; `PO_MISSING` displays **Missing PO**. The underlying matching/review/approval rules are unchanged.
 
 ---
 

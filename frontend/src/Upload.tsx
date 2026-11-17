@@ -16,6 +16,7 @@ export default function Upload({
   provider = null,
   providerRequired = false,
   configurationReady = true,
+  mockMode = false,
 }: {
   token: string;
   navigate: Navigate;
@@ -23,6 +24,7 @@ export default function Upload({
   provider?: OpenAISession | null;
   providerRequired?: boolean;
   configurationReady?: boolean;
+  mockMode?: boolean;
 }) {
   const sizeLabel = limits
     ? `${(limits.max_pdf_bytes / 1048576).toLocaleString('en-IN', { maximumFractionDigits: 2 })} MiB`
@@ -150,14 +152,15 @@ export default function Upload({
                 onChange={(e) => void choose(e.target.files)}
               />
             </label>
-            <div className="info-line">
-              <Icon name="shield" size={16} />
-              <span>
-                Mock workspaces accept only their generated scenario PDFs. Other PDFs require an
-                explicitly configured live workspace. Missing or uncertain invoice evidence goes to
-                review.
-              </span>
-            </div>
+            {mockMode && (
+              <div className="info-line" role="note" aria-label="Mock extraction">
+                <Icon name="shield" size={16} />
+                <span>
+                  Mock workspaces accept only their own sample invoice PDFs. No live OpenAI call is
+                  made.
+                </span>
+              </div>
+            )}
             {error && (
               <div className="error" role="alert">
                 {error}
@@ -181,18 +184,14 @@ export default function Upload({
         </section>
         <aside className="upload-explainer">
           <h2>After you submit</h2>
-          <p>Follow this invoice from upload to a recorded outcome in My invoices.</p>
+          <p>Track progress and read the outcome in My invoices.</p>
           {[
             [
               'file',
               'Document received',
               'Your original PDF is stored with its processing record.',
             ],
-            [
-              'shield',
-              'Processing',
-              'The invoice is checked against source evidence and purchase records.',
-            ],
+            ['shield', 'Processing', 'Invoice details and purchase order information are checked.'],
             [
               'check',
               'Outcome recorded',
@@ -207,7 +206,6 @@ export default function Upload({
               </div>
             </div>
           ))}
-          <small>Processing starts when the configured worker is available.</small>
         </aside>
       </div>
     </>

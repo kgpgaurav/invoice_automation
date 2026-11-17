@@ -1,8 +1,18 @@
 # Selected invoice workspace — visual and interaction QA
 
+**Publication status, checked 18 November 2026:** the redesign/DM Sans baseline was committed and pushed as [1c161af](https://github.com/kgpgaurav/invoice_automation/commit/1c161af). The [live application](https://invoiceautomation-seven.vercel.app/) serves the redesigned entry screen and DM Sans. The public application, health, readiness and upload-configuration endpoints returned 200. [Public entry screenshot](docs/screenshots/deployed-entry-2026-11-18.png). This was a read-only unauthenticated check, not a hosted invoice-processing, worker-activation or paid-model test. The screenshot comparisons below are dated local design evidence; the baseline is no longer uncommitted or awaiting its first deployment.
+
 Source visual truth: the user's **1487 × 1058 inline mockup** supplied after the Product Design brief (Review queue, INV-1048, Kaveri Office Supplies). It is available in the conversation, not as a standalone repository image. Comparison is a manual visual assessment against that exact attachment, not a claimed pixel-diff score or an independently identified font match.
 
 Implementation layout baseline (before the later DM Sans selection): [desktop viewport](docs/screenshots/ui-2026-11-17/review-queue-viewport.png), [full queue/detail](docs/screenshots/ui-2026-11-17/review-queue.png). CSS viewport **1487 × 1058**, device scale factor 1, screenshot scale CSS; viewport capture is exactly 1487 × 1058. The full-page capture includes content below the viewport, without resizing it to manufacture a match. Source has no browser chrome. Same interaction: missing-PO exception selected, supporting PO selected, rationale entered, response not submitted. Actual local records differ from the reference's illustrative data and are explicitly marked MOCK EXTRACTION.
+
+## Copy and deployment-status follow-up — 18 November 2026
+
+The subsequent local patch shows sample-PDF instructions only for explicit mock metadata, removes normal submission's managed-connection banner and configured-worker wording, and labels ambiguous POs **Choose purchase order** while missing POs retain **Missing PO**. Personal-key prerequisites and real run provenance stay intact. A new regression exposed a configuration error disappearing after navigation; its explanation now persists on setup/upload screens while submission remains disabled. No new actionable P0/P1/P2 finding remains after reruns.
+
+Inspected evidence: [normal upload](docs/screenshots/ui-2026-11-18/normal-upload.png), [explicit mock upload](docs/screenshots/ui-2026-11-18/mock-upload.png), [ambiguous queue/detail](docs/screenshots/ui-2026-11-18/review-queue.png), each 1440px CSS width with full-page height. The normal-copy case overrides presentation configuration only and selects a synthetic PDF without submitting it; it is not live-extraction evidence. The mock upload and queue use isolated local mock processing with explicit provenance. A separate 390px test presents both missing and ambiguous synthetic queue reasons and confirms their distinct labels without horizontal overflow. The longer ambiguous badge wraps readably on desktop.
+
+All **18 shared/provider/workflow** and **9 role** browser cases pass. **225 backend tests pass, three opt-in live tests skip**; Ruff, migration regression checks, reproducible API generation and frontend formatting/TypeScript/build pass. The pre-existing PDF.js chunk warning remains. This copy/metadata patch is uncommitted and has not been deployed; the publication check above applies to baseline `1c161af`. No public authentication, upload, financial action or paid OpenAI call was performed.
 
 ## Later user amendment: DM Sans and setup guidance
 
@@ -42,7 +52,7 @@ No actionable P0/P1/P2 findings remain. These are expected product/data differen
 
 ## Interaction evidence
 
-All **14 shared/provider/workflow** and **8 role** browser cases pass. Coverage includes original upload/worker/decision flows, source links, stream reconnection and fallback, search/pagination, role denial and ownership, OpenAI model/disconnect/late-response cleanup, invalid/verifying access, correct default landing including empty review queue, error vs no-result states, mobile Back, browser Back/Forward, retained selected URL, required rationale, pending-submit guard and successful real local transaction after explicit mocked extraction.
+The original design pass ran **14 shared/provider/workflow** and **8 role** browser cases successfully; the follow-up above expands that coverage to 18 and nine. Coverage includes original upload/worker/decision flows, source links, stream reconnection and fallback, search/pagination, role denial and ownership, OpenAI model/disconnect/late-response cleanup, invalid/verifying access, correct default landing including empty review queue, error vs no-result states, mobile Back, browser Back/Forward, retained selected URL, required rationale, pending-submit guard and successful real local transaction after explicit mocked extraction.
 
 The isolated manual screenshot pass returned `consoleErrors: []` and `focusReturned: true`. The final centering-only CSS correction was recaptured and inspected. No remote write or paid OpenAI call was performed. Existing old screenshots are historical and unchanged; accepted captures above contain synthetic local data.
 
@@ -52,8 +62,8 @@ The isolated manual screenshot pass returned `consoleErrors: []` and `focusRetur
 - [x] Source/reference composition and focused regions inspected; P1/P2 findings corrected and recaptured.
 - [x] Responsive and keyboard/review behavior verified in isolated Chrome.
 - [x] Backend regression/migration suite, Ruff, generated API hash parity, frontend formatting/type/build checks pass.
-- [x] Local preview retained; changes uncommitted, without push or deployment.
+- [x] Redesign/font baseline committed and pushed as `1c161af`; deployed entry screen/font verified separately from the original local QA.
 
-P3 follow-up: broaden visual testing to longer real invoice layouts and multi-page documents. The new modal was exercised with single-page synthetic PDFs; multi-page paging code and the server's existing page limits are preserved. Vite still reports its existing PDF.js chunk-size warning. This is a local UI review, not hosted extraction/worker activation or a live-provider accuracy benchmark.
+P3 follow-up: broaden visual testing to longer real invoice layouts and multi-page documents. The new modal was exercised with single-page synthetic PDFs; multi-page paging code and the server's existing page limits are preserved. Vite still reports its existing PDF.js chunk-size warning. The original layout/interaction review was local; the public deployment check above verifies entry/font/HTTP availability, not hosted extraction, worker activation or live-provider accuracy.
 
 final result: passed

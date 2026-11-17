@@ -40,7 +40,9 @@ from app.reviews import ReviewConflict, respond
 from app.workflow_models import ReviewRequest
 
 
-def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, engine=None, *, mock_mode: bool = False
+) -> FastAPI:
     settings = settings or Settings()
     if settings.openai_credential_mode == "reviewer":
         from app.provider_credentials import cipher
@@ -110,7 +112,7 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
 
     from app.provider_routes import add_provider_routes
 
-    add_provider_routes(app, settings, engine, require_auth)
+    add_provider_routes(app, settings, engine, require_auth, mock_mode=mock_mode)
 
     @app.get(f"{API_PREFIX}/healthz", response_model=Health)
     def healthz():

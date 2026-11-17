@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { RunPage } from '../src/api';
 
 const enabled = process.env.PS1_BROWSER_ROLES === '1';
 const name = process.env.PS1_BROWSER_DEMO;
@@ -116,6 +117,9 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
     await connect(page, values.REVIEWER_API_TOKEN, '/');
     await expect(page).toHaveURL(/view=review/);
     const invoice = page.getByRole('link', { name: /Aster Technology Services REVIEW-001/ });
+    await expect(page.getByRole('row').filter({ has: invoice })).toContainText(
+      'Choose purchase order',
+    );
     await invoice.click();
     await expect(page).toHaveURL(new RegExp('selected=' + heldRun));
     await expect(page.getByRole('heading', { name: 'Purchase order required' })).toBeVisible();
@@ -207,6 +211,37 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
 
 test.describe('Workspace entry and role navigation', () => {
   test.skip(!enabled, 'Use scripts.browser_checks --roles');
+  test('queue distinguishes missing from ambiguous PO reasons', async ({ page }) => {
+    // Labelled synthetic API projection only; no invoice approval or processing is fabricated.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const records: RunPage = {
+      total_count: 2,
+      next_cursor: null,
+      items: ['PO_MISSING', 'PO_AMBIGUOUS'].map((code, index) => ({
+        run_id: `00000000-0000-4000-8000-00000000000${index + 1}`,
+        created_at: '2026-11-17T10:00:00Z',
+        job_state: 'WAITING_REVIEW',
+        decision: 'NEEDS_REVIEW',
+        invoice_number: code + '-FIXTURE',
+        vendor_name: 'Synthetic queue-label fixture',
+        currency: 'INR',
+        total_gross: '11800.00',
+        reason: 'Synthetic label test',
+        reason_code: code,
+        source_mode: 'MOCK_OPENAI',
+      })),
+    };
+    await page.route('**/api/v1/runs?*', (route) => route.fulfill({ json: records }));
+    await connect(page, values.REVIEWER_API_TOKEN, '/');
+    const missing = page.getByRole('row').filter({ hasText: 'PO_MISSING-FIXTURE' });
+    const ambiguous = page.getByRole('row').filter({ hasText: 'PO_AMBIGUOUS-FIXTURE' });
+    await expect(missing.getByText('Missing PO', { exact: true })).toBeVisible();
+    await expect(ambiguous.getByText('Choose purchase order', { exact: true })).toBeVisible();
+    await expect(ambiguous.getByText('Missing PO', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
   test('signed-out entry hides financial content, handles invalid access and verifies once', async ({
     page,
   }) => {

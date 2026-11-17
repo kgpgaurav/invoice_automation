@@ -312,7 +312,11 @@ def main():
 
             from app.main import create_app
 
-            uvicorn.run(create_app(settings, engine), host="127.0.0.1", port=args.port)
+            uvicorn.run(
+                create_app(settings, engine, mock_mode=meta["mode"] == "mock"),
+                host="127.0.0.1",
+                port=args.port,
+            )
         else:
             if not args.enable_processing:
                 parser.error("Worker requires explicit --enable-processing; no jobs claimed")

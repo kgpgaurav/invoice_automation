@@ -6,11 +6,11 @@ Invoice-PDF intake, source verification, purchase-order matching and recorded fi
 
 [Submit an invoice](https://invoiceautomation-seven.vercel.app/?view=upload) · [Financial review](https://invoiceautomation-seven.vercel.app/?view=review) · [GitHub repository](https://github.com/kgpgaurav/invoice_automation)
 
-**Local UI update (17 November):** the selected operational redesign, locally bundled **DM Sans** typography and before-upload OpenAI setup guide are available in the working tree for review; they have not been deployed. The tutorial below uses the new screen labels. The current public deployment may still show the previous layout. Local changes include a dedicated access screen, role-specific landing pages and a reviewer queue with an adjacent invoice/PDF/action panel. See [visual QA](design-qa.md) and [development results](docs/DEVELOPMENT.md).
+**Published interface:** the operational redesign, locally bundled **DM Sans** typography and before-upload OpenAI setup guide are committed in [1c161af](https://github.com/kgpgaurav/invoice_automation/commit/1c161af). The live application serves the redesigned access screen and DM Sans, verified on **18 November 2026**. The application includes role-specific landing pages and a reviewer queue with an adjacent invoice/PDF/action panel. See [visual QA](design-qa.md) and [development results](docs/DEVELOPMENT.md) for the scope of verification and subsequent changes.
 
 ## Deployment status
 
-The frontend and API are deployed on Vercel, with Supabase PostgreSQL. Public checks on **16 November 2026** returned HTTP 200 for the application and these endpoints:
+The frontend and API are deployed on Vercel, with Supabase PostgreSQL. Read-only public checks on **18 November 2026** returned HTTP 200 for the application and these endpoints:
 
 | Link                                                                                    | What it checks                                                       |
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -18,7 +18,7 @@ The frontend and API are deployed on Vercel, with Supabase PostgreSQL. Public ch
 | [Database readiness](https://invoiceautomation-seven.vercel.app/api/v1/readyz)          | The configured database and business migrations are ready.           |
 | [Upload configuration](https://invoiceautomation-seven.vercel.app/api/v1/openai/config) | Submitter-supplied OpenAI mode, 4-MiB maximum and five-page maximum. |
 
-**Processing prerequisite:** the deployment configuration starts the separate worker at zero instances. The operator must provision reviewed vendor/PO master records and deliberately activate the worker before an invoice can complete processing. A guarded hosted master-data provisioning command remains pending. Health/readiness checks do not establish worker availability, OpenAI credit or a successful hosted invoice run. The tutorial below describes the implemented workflow once those prerequisites are met; see [deployment instructions](docs/DEPLOYMENT.md).
+**Processing prerequisite:** the repository's deployment manifest keeps the separate worker at zero instances by default. The operator must provision reviewed vendor/PO master records and deliberately activate the worker before an invoice can complete processing. A guarded hosted master-data provisioning command remains pending. This public verification did not authenticate, upload a document or call OpenAI; it does not establish deployed worker activation, OpenAI credit or a successful hosted invoice run. The tutorial below describes the implemented workflow once those prerequisites are met; see [deployment instructions](docs/DEPLOYMENT.md).
 
 ## Access and credentials
 
@@ -86,7 +86,7 @@ Ask the submission owner for the synthetic PDFs and confirm that their matching 
 | E3 — Duplicate               | Approve H1 first, then submit `E3-text.pdf`: reject the reliably grounded duplicate without a second allocation. `E3-scan.pdf` remains in review when its identity cannot be corroborated. |
 | E4 — Bank mismatch           | Submit `E4.pdf`: require independent verification of the changed bank suffix. This is a change warning, not a fraud finding.                                                               |
 
-H2's justified INR 2 rounding fixture remains unavailable. An unexplained discrepancy must not be forced into an approval. Mock local workspaces accept only their own generated PDFs and clearly label prepared extraction; they never call OpenAI or classify unrelated PDFs as invoices.
+H2's justified INR 2 rounding fixture remains unavailable. An unexplained discrepancy must not be forced into an approval. Mock local workspaces accept only their own generated PDFs and clearly label prepared extraction; they never call OpenAI or classify unrelated PDFs as invoices. Their sample-PDF upload note appears only when the API explicitly advertises mock mode. Normal submission screens omit mock and worker-operation instructions. In the review queue, ambiguous PO matches say **Choose purchase order**, while a missing supporting PO says **Missing PO**.
 
 ## Troubleshooting
 

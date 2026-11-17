@@ -585,6 +585,12 @@ export interface components {
              * @enum {string}
              */
             mode: "server" | "reviewer";
+            /**
+             * Mock Mode
+             * @description Explicit mock-demo presentation flag; does not enable processing.
+             * @default false
+             */
+            mock_mode: boolean;
             /** Supported Models */
             supported_models: string[];
             /** Max Pdf Bytes */

@@ -207,13 +207,15 @@ export default function ReviewQueue({
                       <td className="amount">{money(run.total_gross, run.currency ?? '')}</td>
                       <td>
                         <span className="queue-reason" title={reasonLabel(run.reason_code)}>
-                          {run.reason_code === 'PO_AMBIGUOUS' || run.reason_code === 'PO_MISSING'
-                            ? 'Missing PO'
-                            : run.reason_code === 'PO_CAP_EXCEEDED'
-                              ? 'Over PO balance'
-                              : run.reason_code === 'BANK_MISMATCH'
-                                ? 'Bank details'
-                                : 'Needs review'}
+                          {run.reason_code === 'PO_AMBIGUOUS'
+                            ? 'Choose purchase order'
+                            : run.reason_code === 'PO_MISSING'
+                              ? 'Missing PO'
+                              : run.reason_code === 'PO_CAP_EXCEEDED'
+                                ? 'Over PO balance'
+                                : run.reason_code === 'BANK_MISMATCH'
+                                  ? 'Bank details'
+                                  : 'Needs review'}
                         </span>
                       </td>
                       <td className="queue-age amount">

@@ -1,5 +1,42 @@
 # Development and verification
 
+## Deployment status and upload/queue copy (2026-11-18)
+
+The redesign/DM Sans baseline was already committed and pushed as `1c161af` before this task. A read-only isolated Chrome check confirmed the redesigned public access screen, loaded DM Sans and HTTP 200 for the application, health, database readiness and upload configuration. No hosted credentials, uploads, model calls or financial writes were used. This verifies public UI/API readiness; hosted worker activation, reviewed masters, processing/recovery and ingress boundaries remain separate gates. The older sections below describe their original local verification dates, not current publication status.
+
+Under SPEC §§3.5–3.6 and 4.1–4.3, show mock instructions only when the existing configuration response explicitly supplies `mock_mode: true`. Credential mode alone cannot identify mock processing, so the explicit demo API launcher derives this additive presentation flag from trusted workspace metadata. Normal application factories default to false; older responses without it remain compatible. It never selects a processor or enables a worker. Remove normal upload's managed-connection banner and configured-worker wording while keeping personal-key prerequisites, limits, idempotency and recorded provenance. The queue labels `PO_AMBIGUOUS` as **Choose purchase order** and retains **Missing PO** for `PO_MISSING`.
+
+Exact changed files and purpose:
+
+| Files | Purpose |
+| --- | --- |
+| `backend/app/main.py`, `backend/app/provider_routes.py`, `backend/scripts/demo.py` | Add explicit mock presentation metadata to the existing response and wire only the demo launcher's trusted mode |
+| `backend/tests/test_presentation_config.py` (new) | Five no-provider cases cover normal server/personal-key defaults and mock/live/personal-key demo launchers |
+| `frontend/openapi.json`, `frontend/src/api.generated.ts` | Regenerate the additive boolean property; no route or financial payload changes |
+| `frontend/src/App.tsx`, `frontend/src/Upload.tsx` | Validate/pass the flag, simplify normal intake, show mock note conditionally, preserve a configuration-failure explanation across navigation |
+| `frontend/src/ReviewQueue.tsx` | Distinguish ambiguous from missing PO reasons without changing matching or review actions |
+| `frontend/tests/provider.spec.ts`, `frontend/tests/roles.spec.ts` | Add five browser cases for true/false/legacy/malformed metadata and both queue labels; retain and extend existing guards and role flows |
+| `README.md`, `SPEC.md`, `docs/DEPLOYMENT.md`, `docs/RUNNING.md` | Correct publication status and document presentation metadata, normal/mock copy and demo API restart |
+| `docs/DECISIONS.md`, `PROGRESS.md`, `design-qa.md`, this file | Record the pre-code contract choice, implementation, verification and remaining boundaries |
+| `docs/screenshots/deployed-entry-2026-11-18.png`, `docs/screenshots/ui-2026-11-18/{normal-upload,mock-upload,review-queue}.png` (new) | Public signed-out evidence and inspected local copy/label captures; local processing uses explicit mocked extraction |
+
+Final verification:
+
+| Command / check | Result |
+| --- | --- |
+| Backend `.venv/Scripts/python.exe -m pytest -q --tb=short -p no:cacheprovider --basetemp=../.local/pytest-contextual-copy`, explicit loopback TEST_DATABASE_URL | **225 passed, 3 opt-in live skips, 352.44s**; includes all prior 220 regressions plus five metadata cases, real isolated PostgreSQL concurrency/rollback/ownership tests and migration upgrade/parity/downgrade/re-upgrade |
+| `.venv/Scripts/ruff.exe check .` and `format --check .` | Passed; 94 Python files formatted |
+| `PS1_BROWSER_CHANNEL=chrome python -m scripts.browser_checks --api-port 8100 --ui-port 5273` | **18 passed in 2.9m**; nine role-only cases skipped here and run separately |
+| Same browser runner with `--roles` | **9 passed in 55.1s**, including existing submitter isolation, reviewer resume and the new 390px PO-label case |
+| `python -m scripts.export_openapi` / `npm run generate:api` | Passed; repeat generation has identical SHA-256 hashes for both files; inspected contract diff contains only the additive `mock_mode` property |
+| `npm run format:check` / `npm run build` | Passed, including TypeScript; existing PDF.js chunk-size warning remains |
+| Read-only public browser / local screenshot inspection | Public entry/font/four GET checks pass; normal upload has no mock/worker wording, explicit mock upload retains its note, ambiguous queue badge fits |
+| Git / configured-secret checks | Whitespace check passed; no staged files or tracked private environment/database artifacts; 229 tracked/unignored files scanned with zero configured non-example credential matches; environment, local demo, dependency and browser-output paths remain ignored |
+
+Failures investigated: Ruff initially caught a long field description; shortened it and regenerated the schema/types before final checks. The first shared browser run passed 17 cases and failed the new malformed-config case: navigation cleared a transient error while upload remained disabled. Store that configuration error separately and show it persistently on setup/upload; the unchanged assertion and full shared/role reruns pass. No tests were removed or relaxed.
+
+The runners used fresh marked schemas on the existing local PostgreSQL at port 55432, isolated API/UI ports 8100/5273 and mocked provider transport. Cleanup reset only their own schemas/processes. The user's retained preview on 8110/5280, original records, secrets and hosted data were untouched. No migration, dependency, financial policy, worker ownership/locking, approval transaction or processing activation changed. No OpenAI charges. This patch is uncommitted and has not been pushed or deployed; publish the updated API/frontend together for the explicit mock flag, and restart an existing local demo API to advertise it.
+
 ## DM Sans and OpenAI setup guidance (2026-11-17 follow-up)
 
 The user selected DM Sans and asked for instructions to connect OpenAI before adding an invoice, with documentation aligned to the new UI. Read the canonical SPEC/AGENTS and current docs first; recorded the decision before code. Preserve the existing uncommitted redesign and user data. This follow-up changes presentation/docs only under SPEC §§3.5/4.3; no backend source, API schema, credential mode/lifetime, migrations, financial rules, worker or secret configuration changed.

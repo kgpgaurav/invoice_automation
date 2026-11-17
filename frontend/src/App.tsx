@@ -13,8 +13,10 @@ import SubmitterRunView from './SubmitterRunView';
 
 export default function App() {
   const [providerMode, setProviderMode] = useState<'server' | 'reviewer' | null>(null);
+  const [mockMode, setMockMode] = useState(false);
   const [provider, setProvider] = useState<OpenAISession | null>(null);
   const [uploadLimits, setUploadLimits] = useState<UploadLimits | null>(null);
+  const [configurationError, setConfigurationError] = useState('');
   const [query, setQuery] = useState(location.search);
   const [token, setToken] = useState('');
   const [draft, setDraft] = useState('');
@@ -53,16 +55,19 @@ export default function App() {
           !Number.isSafeInteger(data.max_pdf_bytes) ||
           data.max_pdf_bytes <= 0 ||
           !Number.isSafeInteger(data.max_pdf_pages) ||
-          data.max_pdf_pages <= 0
+          data.max_pdf_pages <= 0 ||
+          (data.mock_mode !== undefined && typeof data.mock_mode !== 'boolean')
         )
           throw new Error();
         if (controller.signal.aborted) return;
         setUploadLimits({ max_pdf_bytes: data.max_pdf_bytes, max_pdf_pages: data.max_pdf_pages });
         setProviderMode(data.mode);
+        setMockMode(data.mock_mode === true);
+        setConfigurationError('');
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setNotice('Upload configuration could not be loaded. Refresh to try again.');
+          setConfigurationError('Upload configuration could not be loaded. Refresh to try again.');
       });
     return () => controller.abort();
   }, []);
@@ -320,6 +325,11 @@ export default function App() {
       </aside>
       <div className="main-shell">
         <main id="main-content" tabIndex={-1}>
+          {canUpload && configurationError && (view === 'upload' || view === 'connection') && (
+            <div className="error" role="alert">
+              {configurationError}
+            </div>
+          )}
           {notice && (
             <div className="toast" role="status">
               {notice}
@@ -403,7 +413,7 @@ export default function App() {
             </>
           ) : view === 'upload' ? (
             <>
-              {providerMode === 'reviewer' ? (
+              {providerMode === 'reviewer' && (
                 <section className="upload-prerequisite" aria-label="Extraction connection">
                   <Icon name={connected ? 'check' : 'key'} />
                   <div>
@@ -431,20 +441,10 @@ export default function App() {
                     <Icon name="arrow" size={16} />
                   </Link>
                 </section>
-              ) : providerMode === 'server' ? (
-                <section className="upload-prerequisite" aria-label="Extraction connection">
-                  <Icon name="check" />
-                  <div>
-                    <strong>Workspace-managed extraction</strong>
-                    <p>
-                      Your workspace provides the extraction connection. You do not need to enter a
-                      personal OpenAI API key before adding an invoice here.
-                    </p>
-                  </div>
-                </section>
-              ) : null}
+              )}
               <Upload
                 token={token}
+                mockMode={mockMode}
                 navigate={navigate}
                 limits={uploadLimits}
                 provider={provider}

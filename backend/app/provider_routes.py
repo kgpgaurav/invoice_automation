@@ -19,6 +19,10 @@ from app.provider_credentials import (
 
 class ProviderConfig(BaseModel):
     mode: Literal["server", "reviewer"]
+    mock_mode: bool = Field(
+        default=False,
+        description="Explicit mock-demo presentation flag; does not enable processing.",
+    )
     supported_models: list[str]
     max_pdf_bytes: int
     max_pdf_pages: int
@@ -35,11 +39,12 @@ class ProviderConnection(BaseModel):
     expires_at: datetime
 
 
-def add_provider_routes(app, settings, engine, require_auth):
+def add_provider_routes(app, settings, engine, require_auth, *, mock_mode=False):
     @app.get(f"{API_PREFIX}/openai/config", response_model=ProviderConfig)
     def provider_config():
         return ProviderConfig(
             mode=settings.openai_credential_mode,
+            mock_mode=mock_mode,
             supported_models=list(SUPPORTED_MODELS),
             max_pdf_bytes=settings.max_pdf_bytes,
             max_pdf_pages=MAX_PDF_PAGES,

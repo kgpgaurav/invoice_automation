@@ -27,6 +27,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         mode: 'reviewer',
+        mock_mode: false,
         supported_models: ['gpt-6-luna'],
         max_pdf_bytes: 12 * 1048576,
         max_pdf_pages: 5,
@@ -75,6 +76,8 @@ test('reviewer key, explicit model and disconnect; upload stopped before process
   await expect(page.getByLabel('Extraction connection')).toContainText(
     'Add your OpenAI API key first',
   );
+  await expect(page.getByRole('note', { name: 'Mock extraction' })).toHaveCount(0);
+  await expect(page.getByText(/configured worker/i)).toHaveCount(0);
   await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, 'H1.pdf'));
   await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeDisabled();
   await page.getByRole('link', { name: 'Set up connection', exact: true }).click();
@@ -150,9 +153,8 @@ for (const mib of [4, 12]) {
     await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
-    await expect(page.getByLabel('Extraction connection')).toContainText(
-      'Workspace-managed extraction',
-    );
+    await expect(page.getByLabel('Extraction connection')).toHaveCount(0);
+    await expect(page.getByRole('note', { name: 'Mock extraction' })).toHaveCount(0);
     await expect(page.getByLabel('Your OpenAI API key')).toHaveCount(0);
     await expect(page.locator('#upload-limits')).toContainText(`up to ${mib} MiB`);
     await expect(page.locator('#upload-limits')).toContainText('1–5 pages, unencrypted');
@@ -174,3 +176,60 @@ for (const mib of [4, 12]) {
     // Only selection is checked here; no POST, extraction or provider charge is started.
   });
 }
+
+for (const mockMode of [true, false, undefined]) {
+  test(`mock instructions require explicit true metadata (${String(mockMode)})`, async ({
+    page,
+  }) => {
+    await page.route('**/openai/config', (route) =>
+      route.fulfill({
+        json: {
+          mode: 'server',
+          supported_models: [],
+          max_pdf_bytes: 12 * 1048576,
+          max_pdf_pages: 5,
+          ...(mockMode === undefined ? {} : { mock_mode: mockMode }),
+        },
+      }),
+    );
+    await page.reload();
+    await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
+    await expect(page.getByRole('note', { name: 'Mock extraction' })).toHaveCount(
+      mockMode === true ? 1 : 0,
+    );
+    await expect(page.getByText(/configured worker/i)).toHaveCount(0);
+    await page.getByLabel('Invoice PDF').setInputFiles(resolve(directory, 'H1.pdf'));
+    await expect(page.getByRole('button', { name: 'Submit invoice', exact: true })).toBeEnabled();
+    // Presentation-only metadata cases: do not submit a document or change the backend processor.
+    if (mockMode === false)
+      await page.screenshot({
+        path: resolve('..', 'output', 'playwright', 'normal-upload-copy.png'),
+        fullPage: true,
+      });
+  });
+}
+
+test('malformed mock metadata leaves upload configuration unavailable', async ({ page }) => {
+  await page.route('**/openai/config', (route) =>
+    route.fulfill({
+      json: {
+        mode: 'server',
+        mock_mode: 'true',
+        supported_models: [],
+        max_pdf_bytes: 12 * 1048576,
+        max_pdf_pages: 5,
+      },
+    }),
+  );
+  await page.reload();
+  await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
+  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
+  await expect(
+    page.getByText('Upload configuration could not be loaded. Refresh to try again.'),
+  ).toBeVisible();
+  await expect(page.getByLabel('Invoice PDF')).toBeDisabled();
+  await expect(page.getByRole('note', { name: 'Mock extraction' })).toHaveCount(0);
+});
