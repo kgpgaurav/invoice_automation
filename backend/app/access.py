@@ -87,6 +87,11 @@ def submitter_reason(reason, code, decision):
             "TAX_UNCLEAR": "The invoice tax information needs verification.",
             "CRITICAL_FIELD_MISSING": "Required invoice information is missing or unverified.",
             "UNVERIFIED_TOTAL": "The invoice total could not be verified.",
+            "VENDOR_BLACKLISTED": (
+                "The supplier is blacklisted. This invoice cannot be approved "
+                "while the restriction applies."
+            ),
+            "VENDOR_INACTIVE": "The supplier is inactive and needs authorization review.",
         }
         return descriptions.get(
             code, "Required invoice information or financial checks need review."

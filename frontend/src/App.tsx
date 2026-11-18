@@ -10,6 +10,7 @@ import PurchaseOrders from './PurchaseOrders';
 import Scenarios from './Scenarios';
 import OpenAIConnection, { disconnectOpenAI, type OpenAISession } from './OpenAIConnection';
 import SubmitterRunView from './SubmitterRunView';
+import DemoAccess from './DemoAccess';
 
 export default function App() {
   const [providerMode, setProviderMode] = useState<'server' | 'reviewer' | null>(null);
@@ -160,7 +161,7 @@ export default function App() {
           <section className="access-card" aria-label="Workspace access">
             <Icon name="key" size={28} />
             <h1>Connect to your workspace</h1>
-            <p>Enter the access token provided by your workspace administrator.</p>
+            <p>Enter a workspace access token to continue.</p>
             <form onSubmit={(e) => void connect(e)}>
               <label htmlFor="workspace-token">Workspace access token</label>
               <input
@@ -193,13 +194,14 @@ export default function App() {
               Your token opens the screens assigned to you. It stays in this tab and is separate
               from an OpenAI API key.
             </p>
-            <details className="entry-help">
-              <summary>Need an access token?</summary>
-              <p>
-                Ask the person who shared this workspace. Submitter and financial reviewer tokens
-                have different permissions.
-              </p>
-            </details>
+            <DemoAccess
+              disabled={connecting}
+              onUse={(credential) => {
+                setDraft(credential);
+                setAccessError('');
+                document.getElementById('workspace-token')?.focus();
+              }}
+            />
           </section>
         </main>
       </div>
@@ -455,7 +457,12 @@ export default function App() {
           ) : view === 'overview' ? (
             <Overview token={token} navigate={navigate} />
           ) : view === 'purchase-orders' ? (
-            <PurchaseOrders token={token} poId={poId} navigate={navigate} />
+            <PurchaseOrders
+              token={token}
+              poId={poId}
+              navigate={navigate}
+              canCreate={access.role === 'reviewer'}
+            />
           ) : view === 'scenarios' ? (
             <Scenarios navigate={navigate} />
           ) : (

@@ -56,6 +56,7 @@ def dataset():
     )
     e4 = dict(deepcopy(h1), invoice_number="BANK-001", bank_account_last4="9876")
     duplicate = dict(deepcopy(h1), invoice_number="INV 001")
+    created_po = dict(deepcopy(h1), invoice_number="CREATED-001", po_reference="PO-CREATED")
     partials = []
     for number, qty in (("PART-001", "70"), ("PART-002", "35")):
         net = str(Decimal(qty) * 1000)
@@ -81,6 +82,7 @@ def dataset():
         ("E3-text", duplicate, False),
         ("E3-scan", duplicate, True),
         ("E4", e4, False),
+        ("PO-created-invoice", created_po, False),
     ]
     return [(name, pdf(data, scanned), data) for name, data, scanned in values]
 

@@ -30,8 +30,10 @@ from app.contracts import (
     RunEventResponse,
 )
 from app.db import make_engine
+from app.demo_access import add_demo_access_route
 from app.intake import create_intake, validate_pdf
 from app.models import RunEvent
+from app.po_routes import add_po_routes
 from app.read_contracts import RunDetail, SubmitterRunDetail
 from app.read_routes import add_read_routes
 from app.read_service import detail, public_event
@@ -59,6 +61,7 @@ def create_app(
 
     app = FastAPI(title="PS-1 Invoice-to-Decision API", version="0.1.0", lifespan=lifespan)
     app.state.engine = engine
+    add_demo_access_route(app, settings)
     bearer = HTTPBearer(auto_error=False)
 
     @app.exception_handler(RequestValidationError)
@@ -86,6 +89,8 @@ def create_app(
 
     def require_finance(actor: Annotated[Principal, Depends(require_auth)]):
         return require_role(actor, "reviewer")
+
+    add_po_routes(app, engine, require_auth)
 
     @app.get(f"{API_PREFIX}/access", response_model=AccessView)
     def get_access(actor: Annotated[Principal, Depends(require_auth)]):

@@ -184,6 +184,10 @@ export default function Upload({
         </section>
         <aside className="upload-explainer">
           <h2>After you submit</h2>
+          <p>
+            Submitters can upload invoices and track submissions made with their identity. Purchase
+            order creation and financial review are handled by a financial reviewer.
+          </p>
           <p>Track progress and read the outcome in My invoices.</p>
           {[
             [

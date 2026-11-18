@@ -103,6 +103,17 @@ export default function SubmitterRunView({
           <section className="panel provider-panel">
             <h2>{pretty(run.decision ?? run.job_state)}</h2>
             <p>{run.decision_reason ?? 'Your invoice is waiting for processing.'}</p>
+            {run.decision && (
+              <p className="invoice-next-step">
+                {run.decision === 'APPROVED'
+                  ? 'Approved for payment processing. Finance will confirm the payment schedule.'
+                  : run.decision === 'REJECTED'
+                    ? 'This invoice is not approved for payment. See the reason.'
+                    : run.job_state === 'WAITING_REVIEW'
+                      ? 'A financial reviewer will review this invoice.'
+                      : 'Payment is not authorized. See the recorded outcome above.'}
+              </p>
+            )}
             <Mode value={run.source_mode} />
             <p>
               Invoice amount:{' '}

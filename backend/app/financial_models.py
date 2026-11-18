@@ -24,15 +24,33 @@ class Vendor(Base):
     __tablename__ = "vendors"
     __table_args__ = (
         UniqueConstraint("jurisdiction", "normalized_tax_id"),
-        CheckConstraint("status IN ('ACTIVE','INACTIVE')"),
+        UniqueConstraint("jurisdiction", "name_key", name="uq_vendor_name_key"),
+        CheckConstraint("status IN ('ACTIVE','INACTIVE','BLACKLISTED')", name="ck_vendor_status"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     legal_name: Mapped[str] = mapped_column(String(200))
+    name_key: Mapped[str | None] = mapped_column(String(600))
     jurisdiction: Mapped[str] = mapped_column(String(2), default="IN")
     tax_id_original: Mapped[str | None] = mapped_column(String(100))
     normalized_tax_id: Mapped[str | None] = mapped_column(String(15))
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
     bank_last4: Mapped[str | None] = mapped_column(String(4))
+
+
+class VendorAction(Base):
+    __tablename__ = "vendor_actions"
+    __table_args__ = (
+        UniqueConstraint("actor_id", "idempotency_key", name="uq_vendor_action_actor_key"),
+        CheckConstraint("kind IN ('CREATE','STATUS')", name="ck_vendor_action_kind"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    vendor_id: Mapped[UUID] = mapped_column(ForeignKey("vendors.id"), index=True)
+    actor_id: Mapped[str] = mapped_column(String(100))
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(10))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    snapshot_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class PurchaseOrder(Base):
@@ -85,6 +103,20 @@ class PolicyVersion(Base):
     config_json: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[str] = mapped_column(String(100))
+
+
+class POCreation(Base):
+    __tablename__ = "purchase_order_creations"
+    __table_args__ = (
+        UniqueConstraint("actor_id", "idempotency_key", name="uq_po_creation_actor_key"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    po_id: Mapped[UUID] = mapped_column(ForeignKey("purchase_orders.id"), unique=True)
+    actor_id: Mapped[str] = mapped_column(String(100))
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    snapshot_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Invoice(Base):

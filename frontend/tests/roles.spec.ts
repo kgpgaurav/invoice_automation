@@ -43,6 +43,12 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
       await expect(page.getByRole('link', { name: label, exact: true })).toHaveCount(0);
     ownRun = await upload(page, 'H1');
     await expect(page.getByRole('heading', { name: 'Approved', exact: true })).toBeVisible();
+    await expect(
+      page.getByText(
+        'Approved for payment processing. Finance will confirm the payment schedule.',
+        { exact: true },
+      ),
+    ).toBeVisible();
     await expect(page.getByText('Technical audit events', { exact: false })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Inspect PO ledger' })).toHaveCount(0);
     await expect(page.getByLabel('Reviewer access token')).toHaveCount(0);
@@ -86,6 +92,9 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
     await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
     heldRun = await upload(page, 'E2');
     await expect(page.getByRole('heading', { name: 'Needs review', exact: true })).toBeVisible();
+    await expect(
+      page.getByText('A financial reviewer will review this invoice.', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByLabel('Reviewer access token')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Choose the supporting purchase order' }),
@@ -108,6 +117,11 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
     await page.getByRole('link', { name: 'Submit invoice', exact: true }).first().click();
     await upload(page, 'E3-text');
     await expect(page.getByRole('heading', { name: 'Rejected', exact: true })).toBeVisible();
+    await expect(
+      page.getByText('This invoice is not approved for payment. See the reason.', {
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(page.getByLabel('Reviewer access token')).toHaveCount(0);
   });
 
@@ -211,6 +225,84 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
 
 test.describe('Workspace entry and role navigation', () => {
   test.skip(!enabled, 'Use scripts.browser_checks --roles');
+  for (const role of ['submitter', 'reviewer'] as const) {
+    test(`public demo disclosure copies and fills ${role} access; server verifies the role`, async ({
+      page,
+      context,
+    }) => {
+      // Synthetic presentation response; actual role auth still uses this disposable API.
+      await page.route('**/api/v1/demo-access', (route) =>
+        route.fulfill({
+          json: {
+            roles: [
+              { role: 'submitter', token: values.APP_API_TOKEN },
+              { role: 'reviewer', token: values.REVIEWER_API_TOKEN },
+            ],
+          },
+        }),
+      );
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.setViewportSize({ width: role === 'submitter' ? 1440 : 390, height: 1000 });
+      await page.goto('/');
+      const disclosure = page.getByText('Get demo access', { exact: true });
+      await expect(disclosure).toBeVisible();
+      await expect(page.getByRole('button', { name: `Use ${role} token` })).toBeHidden();
+      await disclosure.focus();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByText(/These demo identities and their activity are shared/),
+      ).toBeVisible();
+      await expect(page.getByText(/Connect your own OpenAI API key/)).toBeVisible();
+      await expect(page.getByText(/No OpenAI API key is needed/)).toBeVisible();
+      const purchaseOrderNote = page.getByRole('region', { name: 'Testing with purchase orders' });
+      await expect(purchaseOrderNote).toContainText('sample invoice PDFs');
+      await expect(purchaseOrderNote).toContainText('check the available POs');
+      await expect(purchaseOrderNote).toContainText('Reviewers can also create a new PO');
+      await expect(purchaseOrderNote).toContainText(
+        'Existing POs cannot be edited or deleted here.',
+      );
+      const credential = role === 'submitter' ? values.APP_API_TOKEN : values.REVIEWER_API_TOKEN;
+      await page.getByRole('button', { name: `Copy ${role} token` }).click();
+      await expect(page.getByRole('status')).toContainText('token copied.');
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(credential);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await page.screenshot({
+        path: resolve('..', 'output', 'playwright', `demo-access-${role}.png`),
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: `Use ${role} token` }).click();
+      await expect(page.getByLabel('Workspace access token')).toHaveValue(credential);
+      await expect(page.getByLabel('Workspace access token')).toBeFocused();
+      await expect(page.getByRole('heading', { name: 'Connect to your workspace' })).toBeVisible();
+      await page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await expect(page).toHaveURL(role === 'submitter' ? /view=history/ : /view=review/);
+      await expect(page.getByRole('link', { name: 'OpenAI connection', exact: true })).toHaveCount(
+        role === 'submitter' ? 1 : 0,
+      );
+      await expect(page.getByRole('link', { name: 'Purchase orders', exact: true })).toHaveCount(
+        role === 'reviewer' ? 1 : 0,
+      );
+    });
+  }
+  for (const failure of ['disabled', 'legacy', 'network', 'malformed']) {
+    test(`manual access works when demo access is ${failure}`, async ({ page }) => {
+      await page.route('**/api/v1/demo-access', (route) => {
+        if (failure === 'network') return route.abort();
+        if (failure === 'legacy') return route.fulfill({ status: 404, json: {} });
+        return route.fulfill({
+          json: { roles: failure === 'malformed' ? [{ role: 'reviewer', token: 123 }] : [] },
+        });
+      });
+      await page.goto('/');
+      await expect(page.getByText('Need an access token?', { exact: true })).toBeVisible();
+      await expect(page.getByText('Get demo access', { exact: true })).toHaveCount(0);
+      await page.getByLabel('Workspace access token').fill(values.APP_API_TOKEN);
+      await page.getByRole('button', { name: 'Connect', exact: true }).click();
+      await expect(page).toHaveURL(/view=history/);
+    });
+  }
   test('queue distinguishes missing from ambiguous PO reasons', async ({ page }) => {
     // Labelled synthetic API projection only; no invoice approval or processing is fabricated.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -340,5 +432,236 @@ test.describe('Workspace entry and role navigation', () => {
     });
     await expect(page.getByRole('alert')).toContainText('do not have access');
     await expect(page.getByLabel('Invoice PDF')).toHaveCount(0);
+  });
+
+  test('reviewer registers a vendor, sees blacklisted choices blocked, then records authorization before creating a PO', async ({
+    page,
+  }) => {
+    await connect(page, values.REVIEWER_API_TOKEN, '/?view=purchase-orders');
+    await page.getByRole('button', { name: 'Manage vendors', exact: true }).click();
+    const manager = page.getByRole('region', { name: 'Manage vendors', exact: true });
+    await expect(manager.getByRole('heading', { name: 'Manage vendors' })).toBeFocused();
+    await manager.getByRole('button', { name: 'Add vendor', exact: true }).click();
+    const add = manager.getByRole('form', { name: 'Add vendor', exact: true });
+    await add.getByLabel('Legal vendor name', { exact: true }).fill('Custom supplies & Services');
+    await add.getByLabel('Vendor status', { exact: true }).selectOption('BLACKLISTED');
+    await add
+      .getByLabel('Vendor authorization rationale', { exact: true })
+      .fill('Synthetic supplier restriction for browser testing.');
+    await add.getByRole('button', { name: 'Save vendor', exact: true }).click();
+    await expect(manager.getByRole('status')).toContainText('Vendor added');
+    await expect(manager.getByLabel('Vendor directory')).toContainText('Blacklisted');
+    await manager.getByRole('button', { name: 'Add vendor', exact: true }).click();
+    await add.getByLabel('Legal vendor name', { exact: true }).fill('Custom supplies & Services');
+    await add.getByLabel('Vendor status', { exact: true }).selectOption('ACTIVE');
+    await add
+      .getByLabel('Vendor authorization rationale', { exact: true })
+      .fill('Duplicate identity must not be created.');
+    await add.getByRole('button', { name: 'Save vendor', exact: true }).click();
+    await expect(add.getByRole('alert')).toContainText('already exists');
+    await add.getByRole('button', { name: 'Cancel vendor changes' }).click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: resolve('..', 'output', 'playwright', 'vendors-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: resolve('..', 'output', 'playwright', 'vendors-phone.png'),
+      fullPage: true,
+    });
+    await manager.getByRole('button', { name: 'Back to purchase orders' }).click();
+    await page.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    const form = page.getByRole('region', { name: 'Create purchase order', exact: true });
+    await form
+      .getByLabel('Vendor', { exact: true })
+      .selectOption({ label: 'Custom supplies & Services · Blacklisted' });
+    await expect(form.getByRole('alert')).toContainText(
+      'cannot be created for a blacklisted vendor',
+    );
+    await expect(
+      form.getByRole('button', { name: 'Create purchase order', exact: true }),
+    ).toBeDisabled();
+    const vendorId = await form.getByLabel('Vendor', { exact: true }).inputValue();
+    const forged = await page.request.post('/api/v1/purchase-orders', {
+      headers: {
+        Authorization: 'Bearer ' + values.REVIEWER_API_TOKEN,
+        'X-Idempotency-Key': 'browser-blacklist',
+      },
+      data: {
+        vendor_id: vendorId,
+        po_number: 'PO-BLACKLISTED',
+        currency: 'INR',
+        issued_at: '2026-10-01',
+        cap_gross: '118',
+        reason: 'Forged blocked request.',
+        lines: [
+          { description: 'Custom supplies', quantity: '1', unit_price: '100', tax_rate: '18' },
+        ],
+      },
+    });
+    expect(forged.status()).toBe(409);
+    expect((await forged.json()).detail.message).toContain('blacklisted');
+    await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Manage vendors', exact: true }).click();
+    await manager
+      .getByRole('button', { name: 'Change status for Custom supplies & Services' })
+      .click();
+    const change = manager.getByRole('form', { name: 'Change vendor status' });
+    await change.getByLabel('Vendor status', { exact: true }).selectOption('ACTIVE');
+    await change
+      .getByLabel('Vendor authorization rationale', { exact: true })
+      .fill('Supplier verified and authorized for synthetic purchases.');
+    await change.getByRole('button', { name: 'Save status', exact: true }).click();
+    await expect(manager.getByRole('status')).toContainText('Vendor status recorded');
+    await manager.getByRole('button', { name: 'Back to purchase orders' }).click();
+    await page.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    await form
+      .getByLabel('Vendor', { exact: true })
+      .selectOption({ label: 'Custom supplies & Services · Approved' });
+    await expect(form.getByRole('alert')).toHaveCount(0);
+    await form.getByLabel('PO reference', { exact: true }).fill('PO-CUSTOM-VENDOR');
+    await form.getByLabel('PO issue date', { exact: true }).fill('2026-10-01');
+    await form.getByLabel('Description', { exact: true }).fill('Custom supplies');
+    await form.getByLabel('Quantity', { exact: true }).fill('1');
+    await form.getByLabel('Net unit price (INR)', { exact: true }).fill('100');
+    await form.getByLabel('Tax rate (%)', { exact: true }).fill('18');
+    await form.getByRole('button', { name: 'Calculate totals', exact: true }).click();
+    await expect(form.getByLabel('Calculated order totals')).toContainText('₹118.00');
+    await form.getByRole('button', { name: 'Use total as spending cap' }).click();
+    await expect(form.getByLabel('Gross spending cap (INR)', { exact: true })).toHaveValue(
+      '118.00',
+    );
+    await form
+      .getByLabel('Authorization rationale', { exact: true })
+      .fill('Approved custom vendor and order for test.');
+    await form.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'PO-CUSTOM-VENDOR', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Order totals including tax')).toContainText('₹118.00');
+  });
+
+  test('reviewer creates a PO once after a lost response, then a submitter invoice allocates against it', async ({
+    page,
+  }) => {
+    await connect(page, values.REVIEWER_API_TOKEN, '/?view=purchase-orders');
+    await page.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    const form = page.getByRole('region', { name: 'Create purchase order', exact: true });
+    await expect(form.getByRole('heading', { name: 'Create purchase order' })).toBeFocused();
+    await form
+      .getByLabel('Vendor', { exact: true })
+      .selectOption({ label: 'Aster Office Supplies · Approved · 27ABCDE1234F1Z5' });
+    await form.getByLabel('PO reference', { exact: true }).fill('PO-CREATED');
+    await form.getByLabel('Gross spending cap (INR)', { exact: true }).fill('23600.00');
+    await form.getByLabel('PO issue date', { exact: true }).fill('2026-10-01');
+    const line = form.getByRole('region', { name: 'PO line 1', exact: true });
+    await line.getByLabel('SKU (optional)', { exact: true }).fill('PAPER');
+    await line.getByLabel('Description', { exact: true }).fill('Office paper');
+    await line.getByLabel('Quantity', { exact: true }).fill('20');
+    await line.getByLabel('Net unit price (INR)', { exact: true }).fill('1000');
+    await line.getByLabel('Tax rate (%)', { exact: true }).fill('18');
+    await form
+      .getByLabel('Authorization rationale', { exact: true })
+      .fill('Authorized synthetic office-paper purchase for reviewer-created PO testing.');
+    await form.getByRole('button', { name: 'Add line', exact: true }).click();
+    await form.getByRole('button', { name: 'Remove line 2', exact: true }).click();
+    await form.getByRole('button', { name: 'Calculate totals', exact: true }).click();
+    const totals = form.getByLabel('Calculated order totals');
+    await expect(totals).toContainText('₹23,600.00');
+    await expect(totals).toContainText('₹3,600.00');
+    await line.getByLabel('Quantity', { exact: true }).fill('21');
+    await expect(totals.getByRole('button', { name: 'Use total as spending cap' })).toHaveCount(0);
+    await expect(form.getByLabel('Gross spending cap (INR)', { exact: true })).toHaveValue(
+      '23600.00',
+    );
+    await line.getByLabel('Quantity', { exact: true }).fill('20');
+    await form.getByRole('button', { name: 'Calculate totals', exact: true }).click();
+    await expect(totals).toContainText('₹23,600.00');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: resolve('..', 'output', 'playwright', 'create-po-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: resolve('..', 'output', 'playwright', 'create-po-phone.png'),
+      fullPage: true,
+    });
+    const keys: string[] = [];
+    let committed!: () => void, release!: () => void;
+    const firstCommit = new Promise<void>((resolve) => {
+      committed = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/v1/purchase-orders', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      keys.push(route.request().headers()['x-idempotency-key']);
+      if (keys.length === 1) {
+        const result = await route.fetch();
+        expect(result.status()).toBe(201);
+        committed();
+        await gate;
+        return route.abort('failed');
+      }
+      await route.continue();
+    });
+    await form.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    await firstCommit;
+    await expect(
+      form.getByRole('button', { name: 'Creating purchase order…', exact: true }),
+    ).toBeDisabled();
+    await form
+      .locator('form')
+      .evaluate((element) =>
+        element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+      );
+    expect(keys).toHaveLength(1);
+    release();
+    await expect(form.getByRole('alert')).toContainText('Cannot reach the server');
+    await form.getByRole('button', { name: 'Create purchase order', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'PO-CREATED', exact: true })).toBeVisible();
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    const poId = new URL(page.url()).searchParams.get('po')!;
+    await expect(page.getByRole('region', { name: 'PO creation record' })).toContainText(
+      'reviewer',
+    );
+    await expect(page.getByRole('region', { name: 'PO line terms' })).toContainText('Office paper');
+    await expect(page.getByText('No approved invoice has consumed this PO.')).toBeVisible();
+    const submitter = await page.context().newPage();
+    await connect(submitter, values.APP_API_TOKEN, '/?view=upload');
+    await expect(
+      submitter.getByRole('button', { name: 'Create purchase order', exact: true }),
+    ).toHaveCount(0);
+    expect(
+      (
+        await submitter.request.get('/api/v1/vendors', {
+          headers: { Authorization: 'Bearer ' + values.APP_API_TOKEN },
+        })
+      ).status(),
+    ).toBe(403);
+    await upload(submitter, 'PO-created-invoice');
+    await expect(submitter.getByRole('heading', { name: 'Approved', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Refresh purchase orders' }).click();
+    await expect(page.getByRole('link', { name: 'CREATED-001', exact: true })).toBeVisible();
+    const ledger = await page.request.get('/api/v1/purchase-orders/' + poId, {
+      headers: { Authorization: 'Bearer ' + values.REVIEWER_API_TOKEN },
+    });
+    const data = await ledger.json();
+    expect(data.available_gross).toBe('11800.00');
+    expect(data.allocation_count).toBe(1);
+    expect(data.lines[0].committed_quantity).toBe('10.000000');
+    await submitter.close();
   });
 });

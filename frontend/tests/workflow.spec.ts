@@ -283,10 +283,15 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await page.getByRole('link', { name: 'PO-PARTIAL', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'PO-PARTIAL', exact: true })).toBeVisible();
     ledgerPO = new URL(page.url()).searchParams.get('po')!;
-    await expect(page.getByText('₹1,00,000.00', { exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Purchase order balances' })
+        .getByText('₹1,00,000.00', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('₹30,000.00', { exact: true })).toBeVisible();
-    await expect(page.locator('tbody tr')).toHaveCount(1);
-    await expect(page.locator('tbody')).toContainText('₹70,000.00');
+    const allocations = page.getByRole('region', { name: 'Approved invoice allocations' });
+    await expect(allocations.locator('tbody tr')).toHaveCount(1);
+    await expect(allocations.locator('tbody')).toContainText('₹70,000.00');
     await capture(page, { path: resolve(shots, 'phase1-po-ledger.png'), fullPage: true });
     await page.getByRole('link', { name: 'View invoice', exact: false }).click();
     await approved(page);

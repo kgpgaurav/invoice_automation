@@ -230,6 +230,211 @@ main.access-main {
   font-size: 13px;
   margin-top: 10px;
 }
+.demo-role {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.demo-role h2 {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 650;
+}
+.demo-role code {
+  display: block;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 4px;
+  background: var(--background);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.access-card .demo-actions .button {
+  width: auto;
+  margin: 0;
+  font-size: 12px;
+  min-height: 40px;
+}
+.demo-feedback:empty {
+  display: none;
+}
+.po-create,
+.po-creation-record {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.po-create h2,
+.po-creation-record h2 {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.po-create p,
+.po-role-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.po-create fieldset {
+  border: 0;
+  padding: 0;
+  margin: 22px 0;
+  min-width: 0;
+}
+.po-create legend,
+.po-line-form h3 {
+  font-weight: 650;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.po-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.po-create label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.po-create input,
+.po-create select,
+.po-create textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+}
+.po-wide {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+.po-vendor-search {
+  justify-self: start;
+}
+.po-line-form {
+  border-top: 1px solid var(--border);
+  padding: 18px 0;
+}
+.po-reason {
+  margin-top: 20px;
+}
+.po-reason textarea {
+  min-height: 90px;
+}
+.po-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.vendor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.vendor-heading > div {
+  flex: 1 1 260px;
+}
+.vendor-list {
+  margin: 14px 0 20px;
+}
+.vendor-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.vendor-row > div {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vendor-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.vendor-status {
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: var(--surface);
+}
+.vendor-active {
+  color: #42512a;
+  background: #edf0e4;
+}
+.vendor-blacklisted {
+  color: #872e25;
+  background: #fbece8;
+}
+.po-create .vendor-restriction {
+  padding: 12px;
+  border-left: 3px solid #b94f36;
+  background: #fff3ed;
+  color: #7b3423;
+  margin-bottom: 0;
+}
+.po-totals {
+  margin-top: 22px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+.po-totals h3 {
+  margin-bottom: 8px;
+}
+.po-totals-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.po-totals-list dt {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.po-totals-list dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.saved-po-totals {
+  padding: 0 24px;
+}
+.po-totals-help {
+  padding: 0 24px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.invoice-next-step {
+  border-left: 3px solid var(--brand);
+  padding: 10px 14px;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .po-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .po-create,
+  .po-creation-record {
+    padding: 18px;
+  }
+}
 .access-card .error {
   margin: 4px 0;
 }

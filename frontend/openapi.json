@@ -5,6 +5,404 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/demo-access": {
+      "get": {
+        "summary": "Demo Access",
+        "operationId": "demo_access_api_v1_demo_access_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vendors": {
+      "get": {
+        "summary": "Vendors",
+        "operationId": "vendors_api_v1_vendors_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "include_unavailable",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Unavailable"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorChoices"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Vendor",
+        "operationId": "create_vendor_api_v1_vendors_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "X-Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRecorded"
+                }
+              }
+            }
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRecorded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vendors/{vendor_id}/status": {
+      "patch": {
+        "summary": "Change Vendor Status",
+        "operationId": "change_vendor_status_api_v1_vendors__vendor_id__status_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vendor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vendor Id"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "X-Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorStatusChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRecorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/purchase-orders/preview": {
+      "post": {
+        "summary": "Preview Order",
+        "operationId": "preview_order_api_v1_purchase_orders_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/POPreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POTotals"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/purchase-orders": {
+      "post": {
+        "summary": "Create Order",
+        "operationId": "create_order_api_v1_purchase_orders_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "X-Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/POCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POCreated"
+                }
+              }
+            }
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POCreated"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get Purchase Orders",
+        "operationId": "get_purchase_orders_api_v1_purchase_orders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/POPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access": {
       "get": {
         "summary": "Get Access",
@@ -606,81 +1004,6 @@
         }
       }
     },
-    "/api/v1/purchase-orders": {
-      "get": {
-        "summary": "Get Purchase Orders",
-        "operationId": "get_purchase_orders_api_v1_purchase_orders_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 120,
-              "default": "",
-              "title": "Q"
-            }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 100
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 25,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/POPage"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/purchase-orders/{po_id}": {
       "get": {
         "summary": "Get Purchase Order",
@@ -1098,6 +1421,44 @@
         ],
         "title": "DashboardSummary"
       },
+      "DemoAccess": {
+        "properties": {
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/DemoCredential"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roles"
+        ],
+        "title": "DemoAccess"
+      },
+      "DemoCredential": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "submitter",
+              "reviewer"
+            ],
+            "title": "Role"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "token"
+        ],
+        "title": "DemoCredential"
+      },
       "ExtractedField": {
         "properties": {
           "field": {
@@ -1268,6 +1629,167 @@
         ],
         "title": "LedgerEntryView"
       },
+      "POCreate": {
+        "properties": {
+          "po_number": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Po Number"
+          },
+          "vendor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vendor Id"
+          },
+          "currency": {
+            "type": "string",
+            "const": "INR",
+            "title": "Currency"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Issued At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "cap_gross": {
+            "type": "string",
+            "title": "Cap Gross"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/POCreateLine"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "po_number",
+          "vendor_id",
+          "currency",
+          "issued_at",
+          "cap_gross",
+          "reason",
+          "lines"
+        ],
+        "title": "POCreate"
+      },
+      "POCreateLine": {
+        "properties": {
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "unit_price": {
+            "type": "string",
+            "title": "Unit Price"
+          },
+          "tax_rate": {
+            "type": "string",
+            "title": "Tax Rate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "description",
+          "quantity",
+          "unit_price",
+          "tax_rate"
+        ],
+        "title": "POCreateLine"
+      },
+      "POCreated": {
+        "properties": {
+          "po_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Po Id"
+          },
+          "po_number": {
+            "type": "string",
+            "title": "Po Number"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "po_id",
+          "po_number",
+          "created_at"
+        ],
+        "title": "POCreated"
+      },
+      "POCreationView": {
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "title": "Actor Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actor_id",
+          "created_at",
+          "reason"
+        ],
+        "title": "POCreationView"
+      },
       "PODirectoryEntry": {
         "properties": {
           "po_id": {
@@ -1343,6 +1865,22 @@
             "type": "string",
             "title": "Committed Gross"
           },
+          "vendor_status": {
+            "type": "string",
+            "title": "Vendor Status"
+          },
+          "subtotal_net": {
+            "type": "string",
+            "title": "Subtotal Net"
+          },
+          "tax_total": {
+            "type": "string",
+            "title": "Tax Total"
+          },
+          "total_gross": {
+            "type": "string",
+            "title": "Total Gross"
+          },
           "issued_at": {
             "type": "string",
             "title": "Issued At"
@@ -1391,6 +1929,24 @@
           "allocations_truncated": {
             "type": "boolean",
             "title": "Allocations Truncated"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/POLineView"
+            },
+            "type": "array",
+            "title": "Lines",
+            "default": []
+          },
+          "creation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/POCreationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1402,6 +1958,10 @@
           "currency",
           "cap_gross",
           "committed_gross",
+          "vendor_status",
+          "subtotal_net",
+          "tax_total",
+          "total_gross",
           "issued_at",
           "expires_at",
           "ledger_committed_gross",
@@ -1412,6 +1972,94 @@
           "allocations_truncated"
         ],
         "title": "POLedgerView"
+      },
+      "POLineAmounts": {
+        "properties": {
+          "net": {
+            "type": "string",
+            "title": "Net"
+          },
+          "tax": {
+            "type": "string",
+            "title": "Tax"
+          },
+          "gross": {
+            "type": "string",
+            "title": "Gross"
+          }
+        },
+        "type": "object",
+        "required": [
+          "net",
+          "tax",
+          "gross"
+        ],
+        "title": "POLineAmounts"
+      },
+      "POLineView": {
+        "properties": {
+          "line_no": {
+            "type": "integer",
+            "title": "Line No"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "unit_price": {
+            "type": "string",
+            "title": "Unit Price"
+          },
+          "tax_rate": {
+            "type": "string",
+            "title": "Tax Rate"
+          },
+          "committed_quantity": {
+            "type": "string",
+            "title": "Committed Quantity"
+          },
+          "net_amount": {
+            "type": "string",
+            "title": "Net Amount"
+          },
+          "tax_amount": {
+            "type": "string",
+            "title": "Tax Amount"
+          },
+          "gross_amount": {
+            "type": "string",
+            "title": "Gross Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line_no",
+          "sku",
+          "description",
+          "quantity",
+          "unit_price",
+          "tax_rate",
+          "committed_quantity",
+          "net_amount",
+          "tax_amount",
+          "gross_amount"
+        ],
+        "title": "POLineView"
       },
       "POPage": {
         "properties": {
@@ -1445,6 +2093,62 @@
           "total_count"
         ],
         "title": "POPage"
+      },
+      "POPreview": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/POCreateLine"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lines"
+        ],
+        "title": "POPreview"
+      },
+      "POTotals": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "const": "INR",
+            "title": "Currency",
+            "default": "INR"
+          },
+          "subtotal_net": {
+            "type": "string",
+            "title": "Subtotal Net"
+          },
+          "tax_total": {
+            "type": "string",
+            "title": "Tax Total"
+          },
+          "total_gross": {
+            "type": "string",
+            "title": "Total Gross"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/POLineAmounts"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subtotal_net",
+          "tax_total",
+          "total_gross",
+          "lines"
+        ],
+        "title": "POTotals"
       },
       "POView": {
         "properties": {
@@ -2707,6 +3411,168 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VendorChoice": {
+        "properties": {
+          "vendor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vendor Id"
+          },
+          "legal_name": {
+            "type": "string",
+            "title": "Legal Name"
+          },
+          "tax_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VendorStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor_id",
+          "legal_name",
+          "tax_id",
+          "status"
+        ],
+        "title": "VendorChoice"
+      },
+      "VendorChoices": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VendorChoice"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_count"
+        ],
+        "title": "VendorChoices"
+      },
+      "VendorCreate": {
+        "properties": {
+          "legal_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Legal Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VendorStatus"
+          },
+          "tax_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Id"
+          },
+          "bank_last4": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Last4"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "legal_name",
+          "status",
+          "reason"
+        ],
+        "title": "VendorCreate"
+      },
+      "VendorRecorded": {
+        "properties": {
+          "vendor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vendor Id"
+          },
+          "action_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Action Id"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor_id",
+          "action_id",
+          "recorded_at"
+        ],
+        "title": "VendorRecorded"
+      },
+      "VendorStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "INACTIVE",
+          "BLACKLISTED"
+        ],
+        "title": "VendorStatus"
+      },
+      "VendorStatusChange": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/VendorStatus"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "VendorStatusChange"
       },
       "VendorView": {
         "properties": {

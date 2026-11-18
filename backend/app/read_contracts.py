@@ -201,7 +201,30 @@ class LedgerEntryView(BaseModel):
     approved_at: AwareDatetime
 
 
+class POLineView(BaseModel):
+    line_no: int
+    sku: str | None
+    description: str
+    quantity: str
+    unit_price: str
+    tax_rate: str
+    committed_quantity: str
+    net_amount: str
+    tax_amount: str
+    gross_amount: str
+
+
+class POCreationView(BaseModel):
+    actor_id: str
+    created_at: AwareDatetime
+    reason: str
+
+
 class POLedgerView(PODirectoryEntry):
+    vendor_status: str
+    subtotal_net: str
+    tax_total: str
+    total_gross: str
     issued_at: str
     expires_at: str | None
     ledger_committed_gross: str
@@ -210,3 +233,5 @@ class POLedgerView(PODirectoryEntry):
     allocations: list[LedgerEntryView]
     allocation_count: int
     allocations_truncated: bool
+    lines: list[POLineView] = []
+    creation: POCreationView | None = None

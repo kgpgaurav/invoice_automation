@@ -69,6 +69,7 @@ export const reasonLabel = (code?: string | null) =>
       CRITICAL_FIELD_MISSING: 'Required information is missing',
       VENDOR_UNKNOWN: 'Supplier identity needs verification',
       VENDOR_INACTIVE: 'Supplier is inactive',
+      VENDOR_BLACKLISTED: 'Supplier is blacklisted',
       VENDOR_ID_MISMATCH: 'Supplier identity conflicts',
       PO_VENDOR_MISMATCH: 'PO belongs to another supplier',
       QTY_EXCEEDED: 'Quantity exceeds the PO allowance',
@@ -144,5 +145,15 @@ export function Link({
     >
       {children}
     </a>
+  );
+}
+export function vendorStatusLabel(status: string) {
+  return (
+    (
+      { ACTIVE: 'Approved', INACTIVE: 'Inactive', BLACKLISTED: 'Blacklisted' } as Record<
+        string,
+        string
+      >
+    )[status] ?? status
   );
 }

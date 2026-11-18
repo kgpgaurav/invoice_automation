@@ -6,11 +6,14 @@ from decimal import Decimal, localcontext
 from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 
-from app.financial_models import ApprovalLedger, Invoice, PurchaseOrder, Vendor
+from app.financial_models import ApprovalLedger, Invoice, POCreation, POLine, PurchaseOrder, Vendor
+from app.po_totals import order_amounts
 from app.read_contracts import (
     LedgerEntryView,
+    POCreationView,
     PODirectoryEntry,
     POLedgerView,
+    POLineView,
     POPage,
     ProcessingFailureView,
     RuleCheckView,
@@ -74,6 +77,7 @@ CHECKS = (
 CODE_CHECK = {
     "VENDOR_UNKNOWN": "VENDOR_IDENTITY",
     "VENDOR_INACTIVE": "VENDOR_IDENTITY",
+    "VENDOR_BLACKLISTED": "VENDOR_IDENTITY",
     "VENDOR_ID_MISMATCH": "VENDOR_IDENTITY",
     "PO_VENDOR_MISMATCH": "PO_MATCH",
     "PO_MISSING": "PO_MATCH",
@@ -110,6 +114,9 @@ EXPLANATIONS = {
     "BANK_MISMATCH": "Bank details differ from the vendor record. Independently verify the change.",
     "VENDOR_UNKNOWN": "The supplier could not be matched reliably to the vendor master.",
     "VENDOR_INACTIVE": "The supplier is inactive. Its authorization requires review.",
+    "VENDOR_BLACKLISTED": (
+        "The supplier is blacklisted. New purchase orders and invoice approvals are blocked."
+    ),
     "VENDOR_ID_MISMATCH": "The printed supplier name conflicts with the matched vendor identity.",
     "PO_VENDOR_MISMATCH": "The purchase order does not belong to this supplier.",
     "PO_CLOSED": "The purchase order is closed, cancelled or expired. Check the supporting record.",
@@ -242,6 +249,11 @@ def purchase_order_detail(session, po_id):
     if row is None:
         raise HTTPException(404, detail="Purchase order not found.")
     po, vendor = row
+    creation = session.scalar(select(POCreation).where(POCreation.po_id == po.id))
+    lines = session.scalars(
+        select(POLine).where(POLine.po_id == po.id).order_by(POLine.line_no)
+    ).all()
+    totals = order_amounts(lines)
     statement = select(ApprovalLedger, Invoice).join(Invoice).where(ApprovalLedger.po_id == po.id)
     entries = session.execute(
         statement.order_by(ApprovalLedger.created_at, ApprovalLedger.id).limit(100)
@@ -265,6 +277,32 @@ def purchase_order_detail(session, po_id):
         balance_reconciled=reconciled,
         allocation_count=count,
         allocations_truncated=count > len(entries),
+        vendor_status=vendor.status,
+        subtotal_net=str(totals.subtotal_net),
+        tax_total=str(totals.tax_total),
+        total_gross=str(totals.total_gross),
+        lines=[
+            POLineView(
+                line_no=line.line_no,
+                sku=line.sku,
+                description=line.description,
+                quantity=str(line.quantity),
+                unit_price=str(line.unit_price),
+                tax_rate=str(line.tax_rate),
+                committed_quantity=str(line.committed_quantity),
+                net_amount=str(amount.net),
+                tax_amount=str(amount.tax),
+                gross_amount=str(amount.gross),
+            )
+            for line, amount in zip(lines, totals.lines, strict=True)
+        ],
+        creation=POCreationView(
+            actor_id=creation.actor_id,
+            created_at=creation.created_at,
+            reason=creation.snapshot_json["reason"],
+        )
+        if creation
+        else None,
         allocations=[
             LedgerEntryView(
                 ledger_id=ledger.id,

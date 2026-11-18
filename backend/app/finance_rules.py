@@ -178,6 +178,11 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
         return review(
             "UNSUPPORTED_CURRENCY", "Only explicitly evidenced INR invoices and POs can approve."
         ), {}
+    if vendor.status == "BLACKLISTED":
+        return review(
+            "VENDOR_BLACKLISTED",
+            "Supplier is blacklisted. No invoice can approve while this restriction applies.",
+        ), {}
     if vendor.status != "ACTIVE":
         return review(
             "VENDOR_INACTIVE", "Supplier is inactive; verify its authorization before processing."

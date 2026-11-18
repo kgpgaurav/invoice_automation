@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app import provider_routes, workflow
 from app.config import Settings
-from app.financial_models import ApprovalLedger, PurchaseOrder
+from app.financial_models import ApprovalLedger, PurchaseOrder, Vendor
 from app.main import create_app
 from app.models import Run
 from app.provider_credentials import ReviewerWorkflowProcessor, create_provider_session
@@ -167,13 +167,79 @@ def test_all_operations_with_three_submitters_and_financial_review(workflow_db, 
             )
             return reply
 
-        for path in ("/healthz", "/readyz", "/openai/config"):
+        for path in ("/healthz", "/readyz", "/openai/config", "/demo-access"):
             for actor in actors:
                 probe("GET", path, actor, 200)
         for actor in actors:
             result = probe("GET", "/access", actor, 401 if actor is None else 200)
             if actor:
                 assert result.json()["actor_id"] == actor
+
+        with Session(engine) as session:
+            vendor_id = str(
+                session.scalar(
+                    select(Vendor.id).where(Vendor.legal_name == "Aster Office Supplies")
+                )
+            )
+        order_body = dict(
+            po_number="PO-MATRIX-CREATED",
+            vendor_id=vendor_id,
+            currency="INR",
+            issued_at="2026-10-01",
+            cap_gross="11800",
+            reason="Synthetic endpoint coverage authorization.",
+            lines=[
+                dict(
+                    description="Office paper",
+                    sku="PAPER",
+                    quantity="10",
+                    unit_price="1000",
+                    tax_rate="18",
+                )
+            ],
+        )
+        for actor in actors:
+            expected = 401 if actor is None else 200 if actor == "reviewer" else 403
+            probe("GET", "/vendors", actor, expected)
+            vendor_result = probe(
+                "POST",
+                "/vendors",
+                actor,
+                401 if actor is None else 201 if actor == "reviewer" else 403,
+                headers={"X-Idempotency-Key": "matrix-vendor-create"},
+                json={
+                    "legal_name": "Endpoint matrix vendor",
+                    "status": "INACTIVE",
+                    "reason": "Synthetic vendor registration coverage.",
+                },
+            )
+            if actor == "reviewer":
+                new_vendor_id = vendor_result.json()["vendor_id"]
+            probe(
+                "POST",
+                "/purchase-orders/preview",
+                actor,
+                expected,
+                json={"lines": order_body["lines"]},
+            )
+            probe(
+                "POST",
+                "/purchase-orders",
+                actor,
+                401 if actor is None else 201 if actor == "reviewer" else 403,
+                headers={"X-Idempotency-Key": "matrix-po-create"},
+                json=order_body,
+            )
+        for actor in actors:
+            probe(
+                "PATCH",
+                "/vendors/{vendor_id}/status",
+                actor,
+                401 if actor is None else 200 if actor == "reviewer" else 403,
+                values={"vendor_id": new_vendor_id},
+                headers={"X-Idempotency-Key": "matrix-vendor-status"},
+                json={"status": "BLACKLISTED", "reason": "Synthetic status coverage."},
+            )
 
         connections = {}
         for actor in actors:
@@ -367,7 +433,7 @@ def test_all_operations_with_three_submitters_and_financial_review(workflow_db, 
             if method in {"get", "post", "delete", "put", "patch"}
         }
         assert observed == implemented
-        assert len(implemented) == 17
+        assert len(implemented) == 23
         for method, path in (
             ("GET", "/policies/current"),
             ("POST", "/policies"),

@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     byok_encryption_key: SecretStr | None = None
     access_mode: Literal["shared", "roles"] = "shared"
     submitter_api_tokens: dict[str, SecretStr] = {}
+    public_demo_access: bool = False
+
+    @model_validator(mode="after")
+    def public_demo_profile(self):
+        if self.public_demo_access and (
+            self.access_mode != "roles"
+            or self.openai_credential_mode != "reviewer"
+            or self.reviewer_api_token is None
+            or self.openai_api_key is not None
+        ):
+            raise ValueError(
+                "Public demo access requires roles, submitter-owned OpenAI credentials, "
+                "a reviewer token and no operator OpenAI key"
+            )
+        return self
 
     @model_validator(mode="after")
     def distinct_identities(self):

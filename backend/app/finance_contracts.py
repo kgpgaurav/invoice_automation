@@ -17,6 +17,7 @@ Rate = Annotated[Decimal, Field(ge=0, le=100, max_digits=9, decimal_places=6)]
 class VendorStatus(StrEnum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+    BLACKLISTED = "BLACKLISTED"
 
 
 class POStatus(StrEnum):
