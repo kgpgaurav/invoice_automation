@@ -123,7 +123,16 @@ def create_app(
 
     @app.get(f"{API_PREFIX}/healthz", response_model=Health)
     def healthz():
-        return Health(status="ok")
+        from app.evidence_verification import VERIFIER_VERSION
+        from app.extraction_schema import PROMPT_VERSION, SCHEMA_VERSION
+
+        return Health(
+            status="ok",
+            extraction_schema_version=SCHEMA_VERSION,
+            prompt_version=PROMPT_VERSION,
+            verifier_version=VERIFIER_VERSION,
+            scan_review_required=True,
+        )
 
     @app.get(f"{API_PREFIX}/readyz", response_model=Health, responses={503: {"model": Health}})
     def readyz():

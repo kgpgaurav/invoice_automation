@@ -67,9 +67,10 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.getByRole('heading', { name: 'Processing timeline' })).toBeVisible();
     await expect(page.locator('.rule-check.passed')).toHaveCount(13);
     cleanRun = new URL(page.url()).searchParams.get('run')!;
-    await page.getByText('Extracted details', { exact: true }).click();
-    await page.getByRole('button', { name: 'View Invoice Number source, page 1' }).click();
-    await expect(page.getByRole('status')).toContainText('Showing page 1');
+    await page.getByRole('tab', { name: 'Invoice data', exact: true }).click();
+    await page.getByLabel('Evidence for Invoice number', { exact: true }).click();
+    await page.getByRole('button', { name: 'View Invoice number source, page 1' }).click();
+    await expect(page.locator('.document-caption')).toContainText('Showing page 1');
     await expect(page.getByRole('img', { name: 'Invoice PDF preview, page 1' })).toHaveAttribute(
       'data-rendered',
       'true',
@@ -171,6 +172,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.locator('.rule-check.passed')).toHaveCount(8);
     await expect(page.locator('[data-rule=PO_PRICE] .check-status')).toHaveText('Not checked');
     await expect(page.locator('[data-rule=PO_BALANCE]')).toContainText('5000.00');
+    await page.getByRole('tab', { name: 'PO comparison', exact: true }).click();
     const comparisons = page.getByRole('region', { name: 'Invoice and PO comparison' });
     await expect(comparisons).toContainText('Available at assessment');
     await expect(comparisons).toContainText('35000');
@@ -289,7 +291,11 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await capture(page, { path: resolve(shots, 'phase1-review-queue.png'), fullPage: true });
     await page.getByLabel('Search invoices').fill('Industrial');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
-    await expect(page.locator('tbody tr')).toHaveCount(1);
+    const queueRows = page
+      .getByRole('region', { name: 'Review items', exact: true })
+      .locator('tbody tr');
+    await expect(queueRows).toHaveCount(1);
+    await expect(queueRows.first()).toContainText('Aster Industrial Supplies');
     await page.getByRole('link', { name: 'Purchase orders', exact: true }).click();
     await page.getByRole('link', { name: 'PO-PARTIAL', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'PO-PARTIAL', exact: true })).toBeVisible();
@@ -338,6 +344,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
           dispatchEvent(new PopStateEvent('popstate'));
         }, route);
         if (route.includes('run=')) {
+          await page.getByRole('tab', { name: 'Financial checks', exact: true }).click();
           await expect(
             page.getByRole('heading', { name: 'Financial rule checklist' }),
           ).toBeVisible();

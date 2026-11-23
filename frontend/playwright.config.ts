@@ -1,6 +1,8 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
+  outputDir: './test-results/' + (process.env.PS1_BROWSER_DEMO ?? 'local'),
+  grep: process.env.PS1_BROWSER_GREP ? new RegExp(process.env.PS1_BROWSER_GREP) : undefined,
   workers: 1,
   fullyParallel: false,
   timeout: 90000,

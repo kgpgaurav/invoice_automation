@@ -18,6 +18,12 @@ class ExtractedField(BaseModel):
     origin: Literal["printed", "derived"] | None = None
     original_value: str | None = None
     calculation: str | None = None
+    extraction_state: (
+        Literal["EXTRACTED", "DERIVED", "MISSING", "AMBIGUOUS", "UNVERIFIED"] | None
+    ) = None
+    source_reason_code: str | None = None
+    source_reason: str | None = None
+    financial_validation_errors: list[str] | None = None
 
 
 class VendorView(BaseModel):

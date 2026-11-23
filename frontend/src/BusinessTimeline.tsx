@@ -110,10 +110,14 @@ export default function BusinessTimeline({
                   : last
                     ? interrupted
                       ? 'Interrupted'
-                      : last.status === 'finished'
-                        ? 'Completed'
-                        : 'In progress'
-                    : 'Not recorded';
+                      : last.status === 'failed'
+                        ? 'Failed'
+                        : last.status === 'finished'
+                          ? 'Completed'
+                          : 'In progress'
+                    : ['QUEUED', 'RUNNING'].includes(run.job_state)
+                      ? 'Pending'
+                      : 'Not recorded';
           const at = decision?.occurred_at ?? last?.finished_at ?? last?.started_at;
           details.push({ title, at, total, count: rows.length, explanation });
           return (
@@ -130,6 +134,7 @@ export default function BusinessTimeline({
                       : '')
               }
               data-stage={key}
+              data-result={status}
             >
               <span className="stage-index" aria-hidden="true">
                 {status === 'Completed' || status === 'Recorded' ? (
@@ -138,12 +143,23 @@ export default function BusinessTimeline({
                   index + 1
                 )}
               </span>
-              <div>
-                <div className="stage-heading">
+              <details className="stage-inspection">
+                <summary className="stage-heading" aria-label={title + ' stage details'}>
                   <strong>{title}</strong>
                   <span>{status}</span>
+                </summary>
+                <div className="stage-inspection-body">
+                  <p>{explanation}</p>
+                  <p>
+                    {at ? dateTime(at) : 'No execution event recorded'}
+                    {total != null && ' · ' + duration(total)}
+                  </p>
+                  {last?.status === 'finished' && status === 'Needs review' && (
+                    <p>Execution completed; its findings require review.</p>
+                  )}
+                  {rows.length > 1 && <p>{rows.length} recorded executions</p>}
                 </div>
-              </div>
+              </details>
             </li>
           );
         })}

@@ -10,9 +10,21 @@ from sqlalchemy import func, select
 
 from app.checkpoints import checkpoint_store
 from app.events import append_event
-from app.evidence_verification import SUPPORTED_VERIFIERS, VERIFIER_VERSION, verify
+from app.evidence_verification import (
+    DIAGNOSTIC_VERIFIERS,
+    LAYOUT_VERIFIERS,
+    SUPPORTED_VERIFIERS,
+    VERIFIER_VERSION,
+    repair_fields,
+    verify,
+)
 from app.extraction_client import ExtractionError
-from app.extraction_schema import PROMPT_VERSION, PROMPTS, SCHEMA_VERSION, InvoiceExtractionV1
+from app.extraction_schema import (
+    PROMPT_VERSION,
+    PROMPTS,
+    parse_extraction,
+    schema_version_for_prompt,
+)
 from app.extraction_store import recorder
 from app.finance_rules import resolve_vendor
 from app.financial_models import PolicyVersion, PurchaseOrder, Vendor
@@ -113,7 +125,7 @@ class WorkflowProcessor:
                     self.policy_version,
                     self.extractor.model,
                     work.prompt_version if work else PROMPT_VERSION,
-                    SCHEMA_VERSION,
+                    schema_version_for_prompt(work.prompt_version if work else PROMPT_VERSION),
                     self.route,
                     self.source_mode,
                 )
@@ -148,6 +160,9 @@ class WorkflowProcessor:
                 work = s.get(WorkflowRun, claim.run_id)
                 remaining = 2 - work.extraction_attempts
                 prompt_version = work.prompt_version
+                wire = work.extraction_json
+                verifier_version = work.verifier_version
+                schema_version = work.schema_version
                 if work.extraction_json is not None and (
                     not state.get("extraction_round") or not remaining
                 ):
@@ -193,7 +208,31 @@ class WorkflowProcessor:
                 with owned_session(worker, claim) as s:
                     run = s.get(Run, claim.run_id)
                     recorder(claim.connection, run.id, run.document_sha256)(attempt)
+                    if prompt_version in ("invoice-extract-3", "invoice-extract-4"):
+                        work = s.get(WorkflowRun, claim.run_id)
+                        work.diagnostic_history = work.diagnostic_history + [
+                            dict(
+                                stage="SCHEMA_VALIDATION",
+                                attempt_id=attempt["attempt_id"],
+                                error_code=attempt["error_code"],
+                                issues=attempt.get("schema_issues", []),
+                                repair_fields=attempt.get("repair_fields", []),
+                                response_schema_version=attempt["schema_version"],
+                            )
+                        ]
 
+            repair = {}
+            if (
+                state.get("extraction_round")
+                and prompt_version in ("invoice-extract-3", "invoice-extract-4")
+                and wire
+            ):
+                previous = parse_extraction(wire, schema_version)
+                checked = verify(previous, pdf, version=verifier_version)
+                targets = repair_fields(checked)
+                if not targets:
+                    return {}
+                repair = dict(previous=previous, repair_fields=targets)
             try:
                 extraction = self.extractor.extract(
                     pdf,
@@ -204,11 +243,15 @@ class WorkflowProcessor:
                     max_attempts=remaining,
                     prompt_version=prompt_version,
                     feedback=(
-                        "\nCritical evidence was unresolved. Re-read missing critical values "
+                        "\nRepair only these source fields and their page citations: "
+                        + ", ".join(repair["repair_fields"])
+                        if repair
+                        else "\nCritical evidence was unresolved. Re-read missing critical values "
                         "and their exact page snippets; never invent or compute source values."
                         if state.get("extraction_round")
                         else None
                     ),
+                    **repair,
                 )
             except ExtractionError as error:
                 with owned_session(worker, claim) as s:
@@ -234,12 +277,29 @@ class WorkflowProcessor:
                 wire = work.extraction_json
                 attempts = work.extraction_attempts
                 verifier_version = work.verifier_version
+                schema_version = work.schema_version
             if wire:
                 checked = verify(
-                    InvoiceExtractionV1.model_validate(wire), pdf, version=verifier_version
+                    parse_extraction(wire, schema_version), pdf, version=verifier_version
                 )
+                if verifier_version in DIAGNOSTIC_VERIFIERS:
+                    with owned_session(worker, claim) as s:
+                        work = s.get(WorkflowRun, claim.run_id)
+                        report = dict(
+                            stage="SOURCE_VERIFICATION",
+                            attempts=attempts,
+                            verifier_version=verifier_version,
+                            findings=list(checked.findings),
+                            fields=list(checked.provenance),
+                        )
+                        if not work.diagnostic_history or work.diagnostic_history[-1] != report:
+                            work.diagnostic_history = work.diagnostic_history + [report]
+                    targets = repair_fields(checked)
+                    if targets and attempts < 2:
+                        return {"code": "CRITICAL_SOURCE_RETRY", "extraction_round": 1}
+                    return {"code": ""}
                 if (
-                    verifier_version == VERIFIER_VERSION
+                    verifier_version in LAYOUT_VERIFIERS
                     and wire.get("po_reference") is None
                     and "PRINTED_FIELD_OMITTED" not in checked.findings
                     and all(
@@ -292,7 +352,7 @@ class WorkflowProcessor:
                     if state["code"] in ("PO_MISSING", "PO_AMBIGUOUS") and work.extraction_json:
                         run = s.get(Run, claim.run_id)
                         checked = verify(
-                            InvoiceExtractionV1.model_validate(work.extraction_json),
+                            parse_extraction(work.extraction_json, work.schema_version),
                             s.get(Document, run.document_id).content,
                             version=work.verifier_version,
                         )
@@ -408,7 +468,7 @@ class WorkflowProcessor:
                 self.policy_version,
                 self.extractor.model,
                 work.prompt_version,
-                SCHEMA_VERSION,
+                schema_version_for_prompt(work.prompt_version),
                 self.route,
                 self.source_mode,
             ):

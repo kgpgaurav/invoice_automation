@@ -1,0 +1,58 @@
+{
+  "mode": "SYNTHETIC_DETERMINISTIC_REPAIR",
+  "notice": "Generated ordinary table and scripted missing date/correction. Not live OpenAI accuracy or real-layout acceptance.",
+  "field_metrics_before": {
+    "correct": 22,
+    "total": 23,
+    "accuracy": "0.9565217391304347826086956522",
+    "expected_present": 12,
+    "extracted_present": 11,
+    "completeness": "0.9166666666666666666666666667",
+    "missing_fields": [
+      "invoice_date"
+    ],
+    "invented_fields": [],
+    "incorrect_fields": []
+  },
+  "field_metrics_after": {
+    "correct": 23,
+    "total": 23,
+    "accuracy": "1",
+    "expected_present": 12,
+    "extracted_present": 12,
+    "completeness": "1",
+    "missing_fields": [],
+    "invented_fields": [],
+    "incorrect_fields": []
+  },
+  "targeted_fields": [
+    "invoice_date"
+  ],
+  "review_findings_before": [
+    "CRITICAL_FIELD_MISSING"
+  ],
+  "review_findings_after": [],
+  "grounding_after": {
+    "labelled_fields": 3,
+    "true_supported": 3,
+    "false_supported": 0,
+    "missed_supported": 0,
+    "precision": "1",
+    "recall": "1"
+  },
+  "local_verifier_latency": {
+    "layout-grounding-4": {
+      "samples": 20,
+      "median_local_verification_ms": 18.572
+    },
+    "layout-diagnostics-5": {
+      "samples": 20,
+      "median_local_verification_ms": 34.337
+    }
+  },
+  "api_calls_made": 0,
+  "api_latency_ms": null,
+  "api_cost_usd": null,
+  "real_invoice_accuracy": null,
+  "metric_notice": "Exact-match accuracy retains expected nulls and structural row counts. Completeness counts only known expected field values; UNKNOWN and row-count metadata are excluded."
+}

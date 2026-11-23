@@ -22,6 +22,10 @@ class JobState(StrEnum):
 class Health(BaseModel):
     status: Literal["ok", "ready", "not_ready"]
     database: Literal["ready", "unavailable"] | None = None
+    extraction_schema_version: str | None = None
+    prompt_version: str | None = None
+    verifier_version: str | None = None
+    scan_review_required: bool | None = None
 
 
 class IntakeResponse(BaseModel):

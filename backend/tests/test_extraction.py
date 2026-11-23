@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from app.evidence_verification import verify
 from app.extraction_client import ExtractionError, OpenAIExtractor, Rates, estimated_cost
 from app.extraction_evaluation import field_metrics
-from app.extraction_schema import InvoiceExtractionV1, output_format
+from app.extraction_schema import InvoiceExtractionV1, InvoiceExtractionV12, output_format
 from app.pdf_input import inspect_pdf
 from tests.extraction_helpers import case, payload, response, untrusted_extraction
 
@@ -49,7 +49,9 @@ def test_responses_request_shape_and_measured_usage():
         return response(extraction)
 
     client = extractor(handler)
-    assert client.extract(pdf, "pdf", attempts.append) == extraction
+    assert client.extract(pdf, "pdf", attempts.append) == InvoiceExtractionV12.model_validate(
+        extraction.model_dump()
+    )
     assert seen[0]["store"] is False and "tools" not in seen[0]
     assert seen[0]["text"]["format"]["strict"] is True
     assert seen[0]["input"][0]["content"][0]["file_data"].startswith("data:application/pdf;base64,")

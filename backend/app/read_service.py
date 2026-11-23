@@ -11,8 +11,8 @@ from fastapi import HTTPException
 from sqlalchemy import String, and_, cast, func, or_, select
 
 from app.access import submitter_reason
-from app.evidence_verification import SUPPORTED_VERIFIERS, VERIFIER_VERSION, verify
-from app.extraction_schema import InvoiceExtractionV1
+from app.evidence_verification import LAYOUT_VERIFIERS, SUPPORTED_VERIFIERS, verify
+from app.extraction_schema import EXTRA_HEADERS, EXTRA_LINES, parse_extraction
 from app.extraction_store import APIUsage
 from app.financial_models import ApprovalLedger, FinancialAssessment, PurchaseOrder, Vendor
 from app.models import Document, Run, RunEvent
@@ -219,7 +219,7 @@ def detail(session, run):
             and hashlib.sha256(document.content).hexdigest() == run.document_sha256
         ):
             checked = verify(
-                InvoiceExtractionV1.model_validate(wire),
+                parse_extraction(wire, work.schema_version),
                 document.content,
                 version=work.verifier_version,
             )
@@ -240,10 +240,13 @@ def detail(session, run):
         def field(path, value, original):
             evidence = verified.get(path)
             local_source = (
-                provenance.get(path, {}) if work.verifier_version == VERIFIER_VERSION else {}
+                provenance.get(path, {}) if work.verifier_version in LAYOUT_VERIFIERS else {}
             )
             source_found = bool(evidence or local_source.get("grounded"))
             source_page = evidence.page if evidence else local_source.get("page")
+            extra = path.rsplit(".", 1)[-1] in (*EXTRA_HEADERS, *EXTRA_LINES)
+            if extra:
+                value = local_source.get("normalized_value", value)
             fields.append(
                 ExtractedField(
                     field=path,
@@ -254,8 +257,9 @@ def detail(session, run):
                     if source_found
                     else "unverified",
                     pages=local_source.get("pages") or ([source_page] if source_page else []),
-                    required_for_approval=path.rsplit(".", 1)[-1]
-                    not in ("vendor_tax_id", "sku", "po_line_no"),
+                    required_for_approval=bool(local_source.get("required"))
+                    if extra
+                    else path.rsplit(".", 1)[-1] not in ("vendor_tax_id", "sku", "po_line_no"),
                     origin="derived"
                     if local_source.get("method") == "DERIVED"
                     else "printed"
@@ -263,18 +267,28 @@ def detail(session, run):
                     else None,
                     original_value=str(original) if original is not None else None,
                     calculation=local_source.get("calculation"),
+                    extraction_state=local_source.get("state"),
+                    source_reason_code=local_source.get("reason_code"),
+                    source_reason=local_source.get("reason"),
+                    financial_validation_errors=local_source.get("financial_validation_errors", []),
                 )
             )
 
-        for key in HEADERS:
+        for key in (
+            *HEADERS,
+            *(EXTRA_HEADERS if work.schema_version == "InvoiceExtractionV1.2" else ()),
+        ):
             field(key, normalized.get(key, wire.get(key)), wire.get(key))
         for index, line in enumerate(wire.get("line_items", []), 1):
             number = (
                 index
-                if work.verifier_version == VERIFIER_VERSION and normalized
+                if work.verifier_version in LAYOUT_VERIFIERS and normalized
                 else line.get("line_no")
             )
-            for key in LINE_FIELDS:
+            for key in (
+                *LINE_FIELDS,
+                *(EXTRA_LINES if work.schema_version == "InvoiceExtractionV1.2" else ()),
+            ):
                 path = (
                     f"lines.{number}.{key}"
                     if number is not None

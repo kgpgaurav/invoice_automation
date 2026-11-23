@@ -76,7 +76,13 @@ def test_detail_pdf_and_events_never_expose_private_fields(workflow_db, settings
             data["source_mode"] == "MOCK_OPENAI"
             and data["usage"]["cost_status"] == "not_applicable"
         )
-        assert all(f["verification"] == "verified" for f in data["fields"])
+        assert all(
+            f["verification"] == "verified" for f in data["fields"] if f["required_for_approval"]
+        )
+        assert any(
+            f["verification"] == "missing" and not f["required_for_approval"]
+            for f in data["fields"]
+        )
         assert all("bank" not in f["field"] for f in data["fields"])
         assert data["purchase_order"]["remaining_gross"] == "38200.00"
         assert data["purchase_order"]["relationship"] == "APPROVED_ALLOCATION"

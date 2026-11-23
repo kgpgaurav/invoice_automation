@@ -125,6 +125,20 @@ def match_lines(document, lines):
 def critical_check(document: FinancialDocument):
     if document.verification_findings:
         codes = set(document.verification_findings)
+        if "SCANNED_DOCUMENT_REQUIRES_REVIEW" in codes:
+            return review(
+                "SCANNED_DOCUMENT_REQUIRES_REVIEW",
+                "Scanned or mixed document requires human review, even when all fields verify.",
+            )
+        if "FINANCIAL_ADJUSTMENT_REQUIRES_REVIEW" in codes:
+            return review(
+                "FINANCIAL_ADJUSTMENT_REQUIRES_REVIEW",
+                "Discounts or charges require finance review under the current policy.",
+            )
+        if codes & {"GST_COMPONENT_MISMATCH", "UNVERIFIED_FINANCIAL_DETAIL"}:
+            return review(
+                "TAX_UNCLEAR", "GST components or financial details are inconsistent or unverified."
+            )
         if codes & {"ARITHMETIC_MISMATCH", "LINE_ARITHMETIC_MISMATCH", "HEADER_LINE_SUM_MISMATCH"}:
             reason = "The printed invoice line amounts, tax and header totals do not reconcile."
         elif "PRINTED_FIELD_OMITTED" in codes:

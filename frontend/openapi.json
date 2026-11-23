@@ -1620,6 +1620,60 @@
               }
             ],
             "title": "Calculation"
+          },
+          "extraction_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EXTRACTED",
+                  "DERIVED",
+                  "MISSING",
+                  "AMBIGUOUS",
+                  "UNVERIFIED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction State"
+          },
+          "source_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Reason Code"
+          },
+          "source_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Reason"
+          },
+          "financial_validation_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Validation Errors"
           }
         },
         "type": "object",
@@ -1669,6 +1723,50 @@
               }
             ],
             "title": "Database"
+          },
+          "extraction_schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Schema Version"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "verifier_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifier Version"
+          },
+          "scan_review_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Review Required"
           }
         },
         "type": "object",

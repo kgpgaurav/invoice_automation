@@ -11,6 +11,7 @@ The application includes a live processing timeline, original PDF preview, invoi
 - [Access and roles](#access-and-roles)
 - [Complete app navigation](#complete-app-navigation)
 - [Submit an invoice](#submit-an-invoice)
+- [Inspect an invoice](#inspect-an-invoice)
 - [Review an exception](#review-an-exception)
 - [Manage vendors and purchase orders](#manage-vendors-and-purchase-orders)
 - [Understand the PO balance panel](#understand-the-po-balance-panel)
@@ -25,7 +26,7 @@ The application includes a live processing timeline, original PDF preview, invoi
 
 ![Financial review queue with a PDF, offered purchase orders and a rationale form](docs/screenshots/ui-2026-11-18/review-queue.png)
 
-_Local browser-test capture using synthetic invoices and explicitly labelled mock extraction. It illustrates the interface, not a fresh live model call or proof of hosted processing._
+_Local browser-test capture refreshed 23 November 2026 using synthetic invoices and explicitly labelled mock extraction. It illustrates the interface, not a fresh live model call or proof of hosted processing._
 
 ## Access and roles
 
@@ -81,7 +82,23 @@ New runs support ordinary text invoice tables with common header/column names, i
 
 Invoices are checked against registered vendors and their referenced POs. Previously processed invoices are consulted only for duplicate identities and the PO's committed allocations; their PDF layouts are not extraction templates. The prepared demo PDFs are test inputs, not an allowlist for live processing.
 
+New extraction diagnostics distinguish missing values from extracted values that local verification cannot associate with a field, conflicting sources, invalid financial formats and locally derived amounts. Evidence disclosures retain the original extraction, normalized values, formulas and reasons. A bounded second pass repairs only requested source fields within the shared two-call limit. Frozen prompt/schema/verifier pairs remain supported. New prompt 4 / `InvoiceExtractionV1.2` / verifier 8 add buyer and address details, due date, payment terms, GST/cess components, HSN/SAC, discounts, shipping and other charges. Unsupported or ambiguous printed financial details and nonzero adjustments require review even when the model returns null, under the existing financial policy. This extension requires migration **0012_extraction_diagnostics** and matching API/worker/frontend code. See [verification results](docs/DEVELOPMENT.md) and [evaluation instructions](docs/benchmarks/README.md) for measured scope and limitations.
+
+**Every scanned, image-only, OCR-overlaid scanned or mixed scanned/digital invoice requires human review, even when all fields verify.** Small logos alone do not trigger this hold. The original PDF reaches OpenAI vision; image-only values retain their visual extraction and citations but remain unverified without independent local grounding. Repeating the same model interpretation does not count as independent OCR evidence. Review/resume and direct financial posting cannot bypass the scan hold; previously approved history stays unchanged.
+
 Explicit mock workspaces need no personal key and accept only their generated fixture PDFs. They are visibly labelled and never call OpenAI. Normal uploads do not silently fall back to mock responses.
+
+## Inspect an invoice
+
+The header brings together the saved invoice number, supplier, date, printed or selected PO, amount/currency, processing state and recorded decision. Source and rule indicators link to the relevant details; unassessed information stays unassessed.
+
+Use **Invoice data** for grouped invoice, supplier and financial values plus a line-item table. Open an item's arrow for its complete values, or open a **Verified / Unverified / Calculated / Missing** indicator for requirements, calculation details and available source-page links. Verified describes local PDF support; it does not mean the value matches the PO or is approved.
+
+The original PDF sits beside the data on wide screens. Use **Zoom in / Zoom out**, **Fit width**, page controls or **Expand PDF** to inspect it. Drag the divider or focus it and use the arrow keys to resize the panels. **Hide PDF / Show PDF** gives the data more space; narrow screens stack the panels. Exact evidence highlighting is unavailable, so page links never imply a highlighted field box.
+
+Finance also has **PO comparison**, **Financial checks** and, when available, **Review response / Review history** tabs. Issues appear above the workspace; comparisons distinguish invoice values, expected records, exact differences and current-versus-assessment provenance. Switching tabs preserves an unfinished review rationale. Submitters receive their existing private field/status view without these internal finance tabs.
+
+Saved fields appear in invoice, supplier, buyer/delivery, tax breakdown and discount/charge groups. Item details include HSN/SAC and component taxes. Optional missing fields remain distinct from mandatory gaps; raw extracted values and unsupported values remain inspectable. Older saved schemas retain their original fields. There is no manual field editor or unrestricted approval action.
 
 ## Review an exception
 
@@ -179,7 +196,7 @@ For a hosted workspace with no vendors or purchase orders, the operator can use 
 | H1 — Clean invoice                | `H1.pdf`: approve ₹11,800 once and show the reason, timeline and remaining PO funds                                                                                                  |
 | E1 — Accumulated partial invoices | Approve `E1-prior.pdf` for ₹70,000 first. `E1.pdf` requests ₹35,000 against ₹30,000 remaining: flag the ₹5,000 excess and hold it without allocation                                 |
 | E2 — Ambiguous PO                 | `E2.pdf`: two supporting candidates; pause for finance selection, then resume the same workflow and revalidate                                                                       |
-| E3 — Duplicate identity           | After H1, `E3-text.pdf` uses `INV 001` instead of `INV-001`: reject the verified duplicate without posting twice. `E3-scan.pdf` stays in review when identity cannot be corroborated |
+| E3 — Duplicate identity           | After H1, `E3-text.pdf` uses `INV 001` instead of `INV-001`: reject the verified duplicate without posting twice. `E3-scan.pdf` always stays in review under the mandatory scan policy |
 | E4 — Changed bank suffix          | `E4.pdf`: invoice last-four differs from the vendor master; request independent verification without accusing fraud                                                                  |
 
 A new `PO-CREATED` can also be tested with `PO-created-invoice.pdf`; its exact setup is in RUNNING.md. Unknown PDFs in mock mode fail transparently rather than receive invented extraction. H2's fully justified ₹2 rounding demonstration is not available and is not forced to approve.
@@ -215,16 +232,16 @@ Model calls run outside database transactions. Financial posting uses a short lo
 
 Follow [RUNNING.md](docs/RUNNING.md) for Windows CMD prerequisites, PostgreSQL, dependencies, and separate API/worker/frontend terminals. The role-separated personal-key profile uses `--mode reviewer --roles`; the configuration word `reviewer` is historical and does not mean finance needs an OpenAI key. Use a separate, explicitly labelled mock workspace for charge-free fixture testing.
 
-The latest verification completed **23 November 2026** with **400 backend tests passing** and three opt-in live skips, including 27 demo-reset cases, nine review-comparison cases and every earlier regression/migration check. **38 browser cases passed** across separate role and shared/provider/workflow suites; the endpoint matrix covers all **25 implemented operations**. Ruff, reproducible OpenAPI/TypeScript generation, frontend formatting and the production build passed. These are local results, not hosted processing acceptance; no new paid model call was made. [DEVELOPMENT.md](docs/DEVELOPMENT.md) records files, initial failures/fixes, commands and limitations; [benchmark evidence](docs/benchmarks/README.md) distinguishes token-cost estimates from actual billing.
+The earlier UI-only verification completed **23 November 2026** with **401 backend tests passing** and three opt-in live skips, including the manual invoice packet and all earlier regression/migration checks. **49 browser cases passed**: 18 role cases and 31 shared/provider/workflow/detail cases, including 11 new UI cases. The endpoint matrix still covers all **25 implemented operations**. Ruff, reproducible OpenAPI/TypeScript generation, application/browser-fixture typing, frontend formatting and the production build passed. All 122 backend Python files and both generated API files retain their pre-redesign hashes. These are local results, not hosted processing acceptance; no new paid model call was made. [DEVELOPMENT.md](docs/DEVELOPMENT.md) records files, initial failures/fixes, commands and limitations; [benchmark evidence](docs/benchmarks/README.md) distinguishes token-cost estimates from actual billing.
 
 ## Deployment status
 
-The frontend/API entry is hosted at [invoiceautomation-seven.vercel.app](https://invoiceautomation-seven.vercel.app/) with Supabase PostgreSQL. On **22 November 2026**, guarded operator setup added the prepared synthetic masters; the authenticated public API confirmed **three vendors and four purchase orders**, with zero allocations on the new orders. Existing invoice/queue/approval table counts and the immutable policy were preserved. Earlier public checks confirmed the access screen, DM Sans and HTTP availability. These checks do not prove hosted invoice processing or worker recovery.
+The matching frontend, API and persistent worker were deployed to [invoiceautomation-seven.vercel.app](https://invoiceautomation-seven.vercel.app/) on **23 November 2026**, using the existing Vercel/Supabase application. Public liveness/readiness and server-enforced role checks pass. The served frontend assets match the new Linux deployment build and contain the expanded field groups. The final release uses prompt 4, schema V1.2, verifier 8 and mandatory scan review.
 
-- Hosted master setup verified migrations through **0010_vendor_management**. Subsequent application updates still require the corresponding frontend/API and worker versions; running setup from a local checkout does not deploy code.
-- The ordinary-layout verifier, compact review and reset controls are local, uncommitted changes awaiting review/deployment. Existing hosted records retain their original verifier; a fresh submission after updating both API and worker exercises the new path. Layout/comparison changes need no migration; demo reset adds **0011_demo_reset** and requires its explicit enable flag.
-- The Vercel manifest leaves the persistent worker disabled at zero instances by default. The operator must deliberately activate it and supply reviewed policy/vendor/PO data. UI/API/database readiness alone does not prove processing works.
-- Hosted upload boundaries, worker recovery, session-preserving PostgreSQL locks, quotas and an end-to-end real-invoice rehearsal remain separate acceptance gates. Personal deployment credentials/runbooks are local-only.
+- The additive migration from **0011_demo_reset** to **0012_extraction_diagnostics** preserved fingerprints of every pre-existing invoice, document, queue, review, assessment, vendor, PO, allocation, policy and audit row. No reset/reseed or financial-policy change was performed.
+- The existing worker runs **one ready instance in iad1** on the new deployment image. The manifest still defaults to zero; the existing authorized production scaling override was restored after the brief migration pause.
+- A fresh hosted scan run used a rasterized copy of a supplied invoice and one live OpenAI request. It reached **NEEDS_REVIEW / SCANNED_DOCUMENT_REQUIRES_REVIEW**, then the same thread stopped via **REQUEST_INFO**, with no extra model request on resume. All financial/master fingerprints remained unchanged, and its temporary encrypted provider session was revoked. A transient polling connection error was recovered by observing the same saved run, without resubmitting it.
+- This release was uploaded from the authorized working tree; changes remain uncommitted/unpushed. Existing approved history and frozen extraction versions remain supported; unposted scans also receive the mandatory authorization hold. Broad original-scan/held-out layout evaluation, hosted crash/lock stress, ingress boundaries and quota endurance remain separate acceptance gates. Private release receipts and credentials stay local.
 
 [API liveness](https://invoiceautomation-seven.vercel.app/api/v1/healthz) · [Database readiness](https://invoiceautomation-seven.vercel.app/api/v1/readyz) · [Upload limits/configuration](https://invoiceautomation-seven.vercel.app/api/v1/openai/config)
 

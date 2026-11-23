@@ -1,0 +1,155 @@
+{
+  "date": "2026-11-23",
+  "dataset_notice": "Five user-supplied digital PDFs in two layout families, used during refinement; not held out. No original scans were supplied.",
+  "source_comparison": {
+    "mode": "OFFLINE_COMPARISON_OF_LIVE_ARTIFACTS",
+    "new_api_calls": 0,
+    "source_api_calls": 5,
+    "documents": 5,
+    "versions": {
+      "layout-diagnostics-5": {
+        "normalized_correct": 117,
+        "normalized_total": 225,
+        "grounded": 33,
+        "missed_supported": 132,
+        "false_supported": 0,
+        "evidence_holds": 4
+      },
+      "extended-diagnostics-8": {
+        "normalized_correct": 225,
+        "normalized_total": 225,
+        "grounded": 165,
+        "missed_supported": 0,
+        "false_supported": 0,
+        "evidence_holds": 2
+      }
+    },
+    "layout_families": 2,
+    "strict_raw_correct": 207,
+    "strict_raw_total": 225,
+    "printed_correct": 149,
+    "printed_total": 150,
+    "printed_missing": 1,
+    "api_latency_p50_ms": 22047,
+    "api_latency_p95_nearest_rank_ms": 28062,
+    "estimated_cost_usd": "0.007907510",
+    "billed_cost_usd": null,
+    "rate_date": "2026-11-12",
+    "notice": "Refinement set, not held out. Evidence holds are separate from financial review. Raw scores retain representation differences; printed scores canonicalize units/grouping. No new model calls, approvals or PO writes."
+  },
+  "expanded_schema_smoke": {
+    "mode": "OFFLINE_COMPARISON_OF_LIVE_ARTIFACTS",
+    "new_api_calls": 0,
+    "source_api_calls": 2,
+    "documents": 2,
+    "versions": {
+      "layout-diagnostics-5": {
+        "normalized_correct": 25,
+        "normalized_total": 46,
+        "grounded": 11,
+        "missed_supported": 24,
+        "false_supported": 0,
+        "evidence_holds": 2
+      },
+      "extended-diagnostics-8": {
+        "normalized_correct": 46,
+        "normalized_total": 46,
+        "grounded": 35,
+        "missed_supported": 0,
+        "false_supported": 0,
+        "evidence_holds": 0
+      }
+    },
+    "layout_families": 2,
+    "strict_raw_correct": 101,
+    "strict_raw_total": 108,
+    "printed_correct": 44,
+    "printed_total": 48,
+    "printed_missing": 0,
+    "api_latency_p50_ms": 20663.5,
+    "api_latency_p95_nearest_rank_ms": 23171,
+    "estimated_cost_usd": "0.00311269",
+    "billed_cost_usd": null,
+    "rate_date": "2026-11-12",
+    "notice": "Refinement set, not held out. Evidence holds are separate from financial review. Raw scores retain representation differences; printed scores canonicalize units/grouping. No new model calls, approvals or PO writes.",
+    "expected_additional_printed_fields": 20,
+    "extracted_additional_fields": 20,
+    "canonical_additional_correct": 20,
+    "independently_grounded_additional": 19,
+    "optional_ungrounded_fields": [
+      "buyer_address"
+    ],
+    "canonical_additional_rules": "Money/rates use Decimal equivalence; address words retain their order with commas, semicolons and whitespace collapsed. Raw strict scores are unchanged."
+  },
+  "regression": {
+    "full_backend_passed": 502,
+    "opt_in_live_skipped": 3,
+    "additional_citation_boundary_cases_passed": 4,
+    "shared_browser_passed": 33,
+    "role_browser_passed": 18,
+    "provided_workflow_replays": 15,
+    "layout_variations": 32,
+    "final_guard_source_workflow_subset_passed": 90,
+    "final_guard_fields_reads_frozen_subset_passed": 41,
+    "ambiguous_null_component_workflows_passed": 2
+  },
+  "calls": {
+    "authorized_maximum": 10,
+    "live_requests_before_hosted_smoke": 7,
+    "offline_replay_requests": 0,
+    "total_live_requests": 8,
+    "remaining_authorized_requests": 2
+  },
+  "limitations": [
+    "Original raw exact-match metrics include representation differences and retained null/UNKNOWN fields.",
+    "Grounding denominators cover independently labelled fields only; no broad false-grounding rate is established by this positive refinement set.",
+    "The 15 full workflow cases replay saved outputs and synthetic masters on original digital, OCR-overlay and rasterized documents; they are not fresh model accuracy measurements.",
+    "Every scanned document requires review. Independent image-only OCR corroboration is unavailable.",
+    "USD estimates use 2026-11-12 rate assumptions; actual billed amounts are unknown."
+  ],
+  "hosted_scan_smoke": {
+    "mode": "HOSTED_LIVE_SCAN_SMOKE",
+    "job_state": "WAITING_REVIEW",
+    "decision": "NEEDS_REVIEW",
+    "reason_code": "SCANNED_DOCUMENT_REQUIRES_REVIEW",
+    "source_mode": "LIVE_OPENAI",
+    "final_job_state": "INTERRUPTED",
+    "final_reason_code": "REQUEST_INFO",
+    "same_thread_resumed": true,
+    "no_extra_model_request_on_resume": true,
+    "financial_state_unchanged": true,
+    "provider_session_revoked": true,
+    "attempts": [
+      {
+        "model_id": "gpt-6-luna",
+        "latency_ms": 26457,
+        "input_tokens": 5123,
+        "output_tokens": 3000,
+        "cached_tokens": 0,
+        "cache_write_tokens": 5120,
+        "error_code": null
+      }
+    ],
+    "document": "Rasterized supplied content, not an independently sourced original scan",
+    "estimated_cost_usd": "0.0021403",
+    "actual_billed_cost_usd": null,
+    "rate_date": "2026-11-12",
+    "frozen_verifier": "extended-diagnostics-7"
+  },
+  "total_estimated_cost_usd": "0.013160500",
+  "actual_billed_cost_usd": null,
+  "final_source_guard_verifier": "extended-diagnostics-8",
+  "release_verification": {
+    "url": "https://invoiceautomation-seven.vercel.app",
+    "verifier": "extended-diagnostics-8",
+    "schema": "InvoiceExtractionV1.2",
+    "prompt": "invoice-extract-4",
+    "migration": "0012_extraction_diagnostics",
+    "ready_workers": 1,
+    "public_health_status": 200,
+    "public_readiness_status": 200,
+    "role_access_verified": true,
+    "preexisting_history_preserved": true,
+    "source_status": "Deployed from authorized uncommitted working tree"
+  }
+}

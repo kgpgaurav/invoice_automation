@@ -140,6 +140,12 @@ EXPLANATIONS = {
     "UNVERIFIED_TOTAL": (
         "Critical source evidence is unresolved. Review the document before proceeding."
     ),
+    "SCANNED_DOCUMENT_REQUIRES_REVIEW": (
+        "Scanned or mixed documents require human review even when all fields verify."
+    ),
+    "FINANCIAL_ADJUSTMENT_REQUIRES_REVIEW": (
+        "Discounts, shipping, other charges or rounding adjustments require finance review."
+    ),
     "CRITICAL_FIELD_MISSING": (
         "Critical invoice information is missing. A corrected document is needed."
     ),

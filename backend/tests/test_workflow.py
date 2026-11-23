@@ -61,4 +61,5 @@ def test_bad_evidence_never_approves(workflow_db, fixture):
         run = s.get(Run, run_id)
         assert (run.job_state, run.decision) == ("WAITING_REVIEW", "NEEDS_REVIEW")
         assert s.scalar(select(func.count()).select_from(ApprovalLedger)) == 0
-    assert len(calls) == (2 if fixture in ("scan", "missing") else 1)
+    # No independent text source can repair a scan or a genuinely absent date.
+    assert len(calls) == 1

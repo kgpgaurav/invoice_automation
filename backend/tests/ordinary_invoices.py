@@ -46,7 +46,9 @@ def invoice(
         text(445, 155, "Nov 20, 2026")
         text(355, 180, "Currency: " + currency)
         headers = [(40, "#"), (70, "Item Description"), (295, "Qty"), (350, "Rate")]
-        if tax and layout != "footer":
+        if tax and layout == "split":
+            headers += [(405, "CGST"), (465, "SGST")]
+        elif tax and layout != "footer":
             headers += [(425, "IGST" if layout == "stacked" else "Tax (%)")]
         headers += [(520, "Amount")]
         for x, label in headers:
@@ -59,7 +61,11 @@ def invoice(
             Decimal("2500") * (1 + Decimal(rate) / 100) if inclusive else Decimal("2500")
         )
         text(350, 310, f"{display_price:.2f}")
-        if tax and layout != "footer":
+        if tax and layout == "split":
+            for x in (405, 465):
+                text(x, 310, tax_amount / 2)
+                text(x, 326, str(Decimal(rate) / 2))
+        elif tax and layout != "footer":
             text(425, 310, tax_amount if layout == "stacked" else rate + "%")
             if layout == "stacked":
                 text(425, 326, rate)

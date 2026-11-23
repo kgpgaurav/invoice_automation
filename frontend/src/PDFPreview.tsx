@@ -19,6 +19,7 @@ export default function PDFPreview({
     [width, setWidth] = useState(0),
     [error, setError] = useState('');
   const [rendered, setRendered] = useState(false);
+  const [zoom, setZoom] = useState(100);
   useEffect(() => {
     if (
       document &&
@@ -39,6 +40,7 @@ export default function PDFPreview({
   useEffect(() => {
     setDocument(null);
     setPage(1);
+    setZoom(100);
     setError('');
     const task = getDocument({ url });
     let active = true;
@@ -63,12 +65,13 @@ export default function PDFPreview({
       .getPage(page)
       .then((pdfPage) => {
         if (!active || !canvas.current) return;
-        const scale = width / pdfPage.getViewport({ scale: 1 }).width;
+        const displayWidth = (width * zoom) / 100;
+        const scale = displayWidth / pdfPage.getViewport({ scale: 1 }).width;
         const viewport = pdfPage.getViewport({ scale: scale * Math.min(devicePixelRatio, 2) });
         const target = canvas.current;
         target.width = Math.ceil(viewport.width);
         target.height = Math.ceil(viewport.height);
-        target.style.width = `${width}px`;
+        target.style.width = `${displayWidth}px`;
         target.style.height = `${viewport.height / Math.min(devicePixelRatio, 2)}px`;
         const context = target.getContext('2d');
         if (!context) throw new Error('PDF canvas unavailable. Use Open PDF to view the original.');
@@ -85,11 +88,11 @@ export default function PDFPreview({
       active = false;
       task?.cancel();
     };
-  }, [document, page, width]);
+  }, [document, page, width, zoom]);
   return (
     <div className="pdf-preview" ref={container}>
-      {document?.numPages !== 1 && (
-        <div className="pdf-toolbar">
+      <div className="pdf-toolbar" aria-label="PDF controls">
+        <div className="pdf-page-controls">
           <button
             className="button quiet small"
             disabled={!document || page <= 1}
@@ -108,18 +111,42 @@ export default function PDFPreview({
             Next page
           </button>
         </div>
-      )}
+        <div className="pdf-zoom-controls">
+          <button
+            className="button quiet small"
+            aria-label="Zoom out"
+            disabled={zoom <= 50}
+            onClick={() => setZoom((value) => Math.max(50, value - 25))}
+          >
+            −
+          </button>
+          <output aria-label="PDF zoom">{zoom}%</output>
+          <button
+            className="button quiet small"
+            aria-label="Zoom in"
+            disabled={zoom >= 200}
+            onClick={() => setZoom((value) => Math.min(200, value + 25))}
+          >
+            +
+          </button>
+          <button className="text-link" onClick={() => setZoom(100)}>
+            Fit width
+          </button>
+        </div>
+      </div>
       {error && (
         <div className="error" role="alert">
           {error}
         </div>
       )}
-      <canvas
-        ref={canvas}
-        role="img"
-        aria-label={`Invoice PDF preview, page ${page}`}
-        data-rendered={rendered ? 'true' : 'false'}
-      />
+      <div className="pdf-canvas-viewport">
+        <canvas
+          ref={canvas}
+          role="img"
+          aria-label={`Invoice PDF preview, page ${page}`}
+          data-rendered={rendered ? 'true' : 'false'}
+        />
+      </div>
       {!rendered && !error && <p className="empty-inline">Rendering original PDF…</p>}
     </div>
   );

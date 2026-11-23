@@ -20,6 +20,12 @@ def flatten(data, prefix=""):
 
 def field_metrics(expected, actual):
     truth, predicted = flatten(expected), flatten(actual)
+    available = {
+        k: v
+        for k, v in truth.items()
+        if not k.endswith(".count") and v is not None and v != "UNKNOWN"
+    }
+    present = sum(predicted.get(k) is not None and predicted.get(k) != "UNKNOWN" for k in available)
     correct, missing, invented, unsupported = 0, [], [], []
     decimal_names = {
         "quantity",
@@ -50,8 +56,27 @@ def field_metrics(expected, actual):
     return {
         "correct": correct,
         "total": len(truth),
-        "accuracy": str(Decimal(correct) / len(truth)),
+        "accuracy": str(Decimal(correct) / len(truth)) if truth else None,
+        "expected_present": len(available),
+        "extracted_present": present,
+        "completeness": str(Decimal(present) / len(available)) if available else None,
         "missing_fields": missing,
         "invented_fields": invented,
         "incorrect_fields": unsupported,
+    }
+
+
+def grounding_metrics(expected, provenance):
+    """Requires independently labelled support truth, never model confidence."""
+    actual = {p["field"]: bool(p.get("grounded")) for p in provenance}
+    tp = sum(supported and actual.get(path, False) for path, supported in expected.items())
+    fp = sum(not supported and actual.get(path, False) for path, supported in expected.items())
+    fn = sum(supported and not actual.get(path, False) for path, supported in expected.items())
+    return {
+        "labelled_fields": len(expected),
+        "true_supported": tp,
+        "false_supported": fp,
+        "missed_supported": fn,
+        "precision": str(Decimal(tp) / (tp + fp)) if tp + fp else None,
+        "recall": str(Decimal(tp) / (tp + fn)) if tp + fn else None,
     }

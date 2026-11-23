@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-PROMPT_VERSION = "invoice-extract-2"
-SCHEMA_VERSION = "InvoiceExtractionV1.1"
+PROMPT_VERSION = "invoice-extract-4"
+SCHEMA_VERSION = "InvoiceExtractionV1.2"
 PREPROCESS_VERSION = "pdf-input-1"
 
 
@@ -50,12 +50,113 @@ class InvoiceExtractionV1(WireModel):
     evidence: list[FieldEvidenceV1]
 
 
-def output_format():
+EXTRA_HEADERS = (
+    "buyer_name",
+    "buyer_tax_id",
+    "buyer_address",
+    "vendor_address",
+    "ship_to_address",
+    "due_date",
+    "payment_terms",
+    "discount_amount",
+    "discount_rate",
+    "shipping_amount",
+    "other_charges",
+    "rounding_adjustment",
+    "cgst_rate",
+    "cgst_amount",
+    "sgst_rate",
+    "sgst_amount",
+    "igst_rate",
+    "igst_amount",
+    "cess_rate",
+    "cess_amount",
+)
+EXTRA_LINES = (
+    "hsn_sac",
+    "discount_amount",
+    "discount_rate",
+    "cgst_rate",
+    "cgst_amount",
+    "sgst_rate",
+    "sgst_amount",
+    "igst_rate",
+    "igst_amount",
+    "cess_rate",
+    "cess_amount",
+)
+
+
+class InvoiceLineV12(InvoiceLineV1):
+    hsn_sac: str | None = None
+    discount_amount: str | None = None
+    discount_rate: str | None = None
+    cgst_rate: str | None = None
+    cgst_amount: str | None = None
+    sgst_rate: str | None = None
+    sgst_amount: str | None = None
+    igst_rate: str | None = None
+    igst_amount: str | None = None
+    cess_rate: str | None = None
+    cess_amount: str | None = None
+
+
+class InvoiceExtractionV12(InvoiceExtractionV1):
+    line_items: list[InvoiceLineV12]
+    buyer_name: str | None = None
+    buyer_tax_id: str | None = None
+    buyer_address: str | None = None
+    vendor_address: str | None = None
+    ship_to_address: str | None = None
+    due_date: str | None = None
+    payment_terms: str | None = None
+    discount_amount: str | None = None
+    discount_rate: str | None = None
+    shipping_amount: str | None = None
+    other_charges: str | None = None
+    rounding_adjustment: str | None = None
+    cgst_rate: str | None = None
+    cgst_amount: str | None = None
+    sgst_rate: str | None = None
+    sgst_amount: str | None = None
+    igst_rate: str | None = None
+    igst_amount: str | None = None
+    cess_rate: str | None = None
+    cess_amount: str | None = None
+
+
+def schema_version_for_prompt(prompt):
+    return SCHEMA_VERSION if prompt == "invoice-extract-4" else "InvoiceExtractionV1.1"
+
+
+def extraction_model(schema_version):
+    if schema_version == "InvoiceExtractionV1.1":
+        return InvoiceExtractionV1
+    if schema_version == SCHEMA_VERSION:
+        return InvoiceExtractionV12
+    raise ValueError("Unsupported frozen extraction schema")
+
+
+def parse_extraction(data, schema_version):
+    return extraction_model(schema_version).model_validate(data)
+
+
+def output_format(prompt_version=PROMPT_VERSION):
+    model = extraction_model(schema_version_for_prompt(prompt_version))
+    schema = model.model_json_schema()
+    if model is InvoiceExtractionV12:
+        # Compatibility decoding permits absent new optional fields, but the live
+        # Structured Output contract requires every key explicitly, with null allowed.
+        for definition in (schema, *schema.get("$defs", {}).values()):
+            if "properties" in definition:
+                definition["required"] = list(definition["properties"])
+                for prop in definition["properties"].values():
+                    prop.pop("default", None)
     return {
         "type": "json_schema",
         "name": "InvoiceExtractionV1",
         "strict": True,
-        "schema": InvoiceExtractionV1.model_json_schema(),
+        "schema": schema,
     }
 
 
@@ -90,4 +191,33 @@ and correct page for each extracted field. A citation to another row or the buye
 """
 )
 
-PROMPTS = {"invoice-extract-1": LEGACY_INSTRUCTIONS, PROMPT_VERSION: INSTRUCTIONS}
+PROMPTS = {
+    "invoice-extract-1": LEGACY_INSTRUCTIONS,
+    "invoice-extract-2": INSTRUCTIONS,
+    "invoice-extract-3": INSTRUCTIONS
+    + """
+Interpret the entire PDF, including images, headers, footers, notes, wrapped descriptions and
+irregular tables. Labels and column positions may vary. Keep printed tax components distinct
+from totals: do not treat a CGST or SGST component as total GST. Use contextual labels to read
+inclusive/exclusive tax, never infer a convention merely to make arithmetic balance.
+When the response schema requests a field-only repair, return only its requested values and
+their exact citations. Paths lines.<position> use the original 1-based extracted row position;
+do not reorder, add or drop rows. Null remains valid when the PDF cannot establish a value.
+""",
+}
+
+PROMPTS[PROMPT_VERSION] = (
+    PROMPTS["invoice-extract-3"]
+    + """
+Also extract the requested buyer/bill-to identity and address, supplier address, ship-to address,
+due date, payment terms, HSN/SAC, discounts, shipping/other charges, rounding adjustment and
+separate CGST/SGST/IGST/cess amounts and percent rates at header and line level. Treat all regions,
+table headings, footers and notes as document data, irrespective of layout or alternative labels.
+Return null for absent, ambiguous or illegible fields; zero only when explicitly supported.
+Keep seller GSTIN separate from buyer GSTIN. Do not copy master-data assumptions into the PDF.
+For a printed 10% rate return decimal string "10" and preserve "10%" in its evidence snippet.
+Do not add percent signs/currency/grouping to numeric value strings; keep them in evidence.
+Do not invent component totals, discounts or payment dates. Quote source pages for optional fields
+too. Scanned documents always require human review even if all fields appear readable.
+"""
+)

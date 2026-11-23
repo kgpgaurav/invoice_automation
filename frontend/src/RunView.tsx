@@ -1,25 +1,18 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   api,
   request,
-  dateTime,
   duration,
   errorMessage,
   mergeEvents,
-  money,
   streamEvents,
   type Run,
   type RunEvent,
   type Review,
 } from './api';
-import { Badge, Link, Mode, pretty, type Navigate } from './ui';
-import ReviewForm from './ReviewForm';
-import InvoiceDecision from './InvoiceDecision';
-import RuleChecklist from './RuleChecklist';
-import BusinessTimeline from './BusinessTimeline';
+import { Link, pretty, type Navigate } from './ui';
 import ReviewDetail from './ReviewDetail';
-import ReviewComparisons from './ReviewComparisons';
-const PDFPreview = lazy(() => import('./PDFPreview'));
+import InvoiceWorkspace from './InvoiceWorkspace';
 
 export default function RunView({
   runId,
@@ -44,8 +37,7 @@ export default function RunView({
     [pdfError, setPdfError] = useState(''),
     [connection, setConnection] = useState('Connecting'),
     [streamVersion, setStreamVersion] = useState(0);
-  const [pageTarget, setPageTarget] = useState({ page: 1, revision: 0 }),
-    [sourceNotice, setSourceNotice] = useState('');
+  const [pdfVersion, setPdfVersion] = useState(0);
   const cursor = useRef(0),
     refreshRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
@@ -118,7 +110,7 @@ export default function RunView({
       controller.abort();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [runId, token]);
+  }, [runId, token, pdfVersion]);
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
@@ -149,15 +141,6 @@ export default function RunView({
     void connect();
     return () => controller.abort();
   }, [runId, token, streamVersion]);
-  const fieldTitle = (path: string) => {
-    const parts = path.split('.');
-    return parts.length === 3 ? `Line ${parts[1]} · ${pretty(parts[2])}` : pretty(path);
-  };
-  function source(page: number, field: string) {
-    setPageTarget((old) => ({ page, revision: old.revision + 1 }));
-    setSourceNotice(`Showing page ${page} for ${fieldTitle(field)}.`);
-    document.getElementById('source-document')?.scrollIntoView({ block: 'start' });
-  }
   function submitted() {
     notify('Review recorded. Processing will revalidate the financial requirements.');
     setReview(null);
@@ -181,23 +164,17 @@ export default function RunView({
         reviewerToken={reviewerToken}
         navigate={navigate}
         connection={connection}
+        retryPDF={() => setPdfVersion((value) => value + 1)}
       />
     );
   return (
     <>
-      <div className="page-heading run-heading">
-        <div>
-          <Link to="?view=history" navigate={navigate} className="back-link">
-            ← Back to Invoice History
-          </Link>
-          <h1 className="mono">{run?.invoice_number ?? 'Invoice details'}</h1>
-          <p className="run-ident">Run {runId}</p>
-        </div>
-        <div className="heading-badges">
-          {run && <Mode value={run.source_mode} />}
-          <Badge value={run?.job_state ?? 'NOT_LOADED'} />
-        </div>
+      <div className="invoice-breadcrumb">
+        <Link to="?view=history" navigate={navigate} className="back-link">
+          ← Back to Invoice History
+        </Link>
       </div>
+      {!run && <h1 className="invoice-loading-title">Invoice details</h1>}
       {error && (
         <div className="error" role="alert">
           {error}
@@ -228,185 +205,23 @@ export default function RunView({
               DEMO REPLAY — cached extraction, not a fresh model call.
             </div>
           )}
-          <InvoiceDecision run={run} navigate={navigate} />
-          <div className="run-layout">
-            <section
-              className="panel document-panel"
-              id="source-document"
-              aria-label="Source document"
-            >
-              <div className="panel-heading">
-                <div>
-                  <h2>Source document</h2>
-                  <p>Original PDF · received {dateTime(run.created_at)}</p>
-                </div>
-                {pdf && (
-                  <a className="text-link" href={pdf} target="_blank" rel="noreferrer">
-                    Open PDF ↗
-                  </a>
-                )}
-              </div>
-              {pdf ? (
-                <Suspense fallback={<div className="empty-state">Loading PDF viewer…</div>}>
-                  <PDFPreview url={pdf} target={pageTarget} />
-                </Suspense>
-              ) : (
-                <div className="empty-state">{pdfError || 'Loading private PDF…'}</div>
-              )}
-              <div className="document-caption" role="status">
-                {sourceNotice ||
-                  'Verified page links are available in extracted details. Exact source highlighting is not available.'}
-              </div>
-            </section>
-            <div className="run-right">
-              <section className="matching-summary panel">
-                <div className="matching-grid">
-                  <div>
-                    <span>Vendor master · current</span>
-                    <strong>{run.vendor?.name ?? 'Not matched'}</strong>
-                    <small>
-                      {run.vendor ? pretty(run.vendor.status) : 'Identity requires verification'}
-                    </small>
-                  </div>
-                  <div>
-                    <span>PO Reference</span>
-                    {run.purchase_order &&
-                    run.purchase_order.relationship !== 'PRINTED_REFERENCE' ? (
-                      <Link
-                        to={'?po=' + run.purchase_order.po_id}
-                        navigate={navigate}
-                        className="text-link mono"
-                      >
-                        {run.purchase_order.po_number} ↗
-                      </Link>
-                    ) : (
-                      <strong className="mono">
-                        {run.purchase_order?.po_number ?? 'Not established'}
-                      </strong>
-                    )}
-                    <small>
-                      {run.purchase_order
-                        ? run.purchase_order.relationship === 'PRINTED_REFERENCE'
-                          ? 'Printed reference only · not a verified match'
-                          : run.purchase_order.relationship === 'APPROVED_ALLOCATION'
-                            ? 'Linked approval allocation'
-                            : 'Recorded assessment PO'
-                        : 'No implicit selection'}
-                    </small>
-                  </div>
-                </div>
-                {run.purchase_order && run.purchase_order.relationship !== 'PRINTED_REFERENCE' && (
-                  <div className="current-po-balance">
-                    <span>Current PO remaining</span>
-                    <strong>
-                      {money(run.purchase_order.remaining_gross, run.purchase_order.currency)}
-                    </strong>
-                    <small>Current master; includes all posted approvals</small>
-                  </div>
-                )}
-              </section>
-              <RuleChecklist run={run} />
-              {run.job_state === 'WAITING_REVIEW' && (
-                <ReviewComparisons run={run} pdf={pdf} showPage={source} />
-              )}
-              {!!run.verification_findings.length && (
-                <section className="findings">
-                  <strong>Source evidence needs review</strong>
-                  <p>
-                    {run.verification_findings.includes('SCANNED_EVIDENCE_REQUIRES_REVIEW')
-                      ? 'This scan has no local text corroboration. Model transcription alone is not trusted evidence.'
-                      : 'Some source fields are missing, conflicting or unresolved. No trust is inferred from a schema-valid extraction.'}
-                  </p>
-                  <details>
-                    <summary>Evidence finding identifiers</summary>
-                    {run.verification_findings.map((code) => (
-                      <p className="mono" key={code}>
-                        {code}
-                      </p>
-                    ))}
-                  </details>
-                </section>
-              )}
-              {review && (
-                <ReviewForm
-                  authorizedToken={reviewerToken}
-                  key={review.review_request_id}
-                  review={review}
-                  reasonCode={run.reason_code}
-                  onRefresh={() => void refreshRef.current()}
-                  onSubmitted={submitted}
-                  notify={notify}
-                />
-              )}
-              <section className="panel fields-panel">
-                <details>
-                  <summary className="panel-heading">
-                    <h2>Extracted details</h2>
-                    <span className="muted">Source status & page links</span>
-                  </summary>
-                  {run.fields.length ? (
-                    <div className="field-list">
-                      {run.fields.map((field) => (
-                        <div className="field-row" key={field.field}>
-                          <span>
-                            {fieldTitle(field.field)}
-                            {field.required_for_approval === false && ' · optional'}
-                          </span>
-                          <strong
-                            className={
-                              /amount|subtotal|total|price/.test(field.field) ? 'amount' : ''
-                            }
-                          >
-                            {field.value == null
-                              ? field.required_for_approval === false
-                                ? 'Not supplied'
-                                : 'Missing'
-                              : /amount|subtotal|total|price$/.test(field.field) &&
-                                  field.field !== 'price_basis'
-                                ? money(field.value, run.invoice_currency ?? '')
-                                : field.value}
-                          </strong>
-                          <div>
-                            <small className={'verification ' + field.verification}>
-                              {field.origin === 'derived'
-                                ? 'Calculated locally'
-                                : field.verification === 'missing' &&
-                                    field.required_for_approval === false
-                                  ? 'Optional'
-                                  : pretty(field.verification)}
-                            </small>
-                            {field.calculation && <small>{field.calculation}</small>}
-                            {field.verification === 'verified' &&
-                              field.pages.map((page) => (
-                                <button
-                                  className="page-link"
-                                  key={page}
-                                  aria-label={`View ${fieldTitle(field.field)} source, page ${page}`}
-                                  onClick={() => source(page, field.field)}
-                                >
-                                  p{page} ↗
-                                </button>
-                              ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="empty-inline">No extraction has been stored.</p>
-                  )}
-                  <p className="table-note">
-                    Verification is local source support, not model confidence. Missing values
-                    remain missing. Original filename was not retained by intake.
-                  </p>
-                </details>
-              </section>
-            </div>
-          </div>
-          <BusinessTimeline
+          <InvoiceWorkspace
             run={run}
             events={events}
+            pdf={pdf}
+            pdfError={pdfError}
+            audience="finance"
             connection={connection}
-            reconnect={() => setStreamVersion((n) => n + 1)}
+            reconnect={() => {
+              setStreamVersion((n) => n + 1);
+              void refreshRef.current();
+            }}
+            navigate={navigate}
+            review={review}
+            reviewerToken={reviewerToken}
+            submitted={submitted}
+            notify={notify}
+            retryPDF={() => setPdfVersion((value) => value + 1)}
           />
           <details className="panel audit-panel disclosure">
             <summary>Evidence & audit metadata</summary>

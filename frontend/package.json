@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "check:types": "tsc --noEmit && tsc -p tsconfig.browser.json",
     "preview": "vite preview --host 127.0.0.1",
     "generate:api": "openapi-typescript openapi.json -o src/api.generated.ts",
     "format:check": "prettier --check src tests playwright.config.ts",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@playwright/test": "^1.65.0",
     "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",

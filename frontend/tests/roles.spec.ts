@@ -52,6 +52,8 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
     await expect(page.getByText('Technical audit events', { exact: false })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Inspect PO ledger' })).toHaveCount(0);
     await expect(page.getByLabel('Reviewer access token')).toHaveCount(0);
+    for (const label of ['PO comparison', 'Financial checks', 'Review response'])
+      await expect(page.getByRole('tab', { name: label, exact: true })).toHaveCount(0);
     await expect(page.getByRole('img', { name: 'Invoice PDF preview, page 1' })).toHaveAttribute(
       'data-rendered',
       'true',
@@ -187,6 +189,15 @@ test.describe.serial('Private submitter and financial reviewer roles', () => {
     await page
       .getByLabel('Review rationale', { exact: true })
       .fill('Matched against supporting procurement record.');
+    await page.getByRole('tab', { name: 'Invoice data', exact: true }).click();
+    await expect(
+      page.getByRole('region', { name: 'Invoice line items', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('tab', { name: 'Review response', exact: true }).click();
+    await expect(page.getByLabel('Review rationale', { exact: true })).toHaveValue(
+      'Matched against supporting procurement record.',
+    );
+    await expect(page.getByRole('radio', { name: /PO-SELECT-001/ })).toBeChecked();
     await expect(page.getByRole('img', { name: 'Invoice PDF preview, page 1' })).toHaveAttribute(
       'data-rendered',
       'true',
@@ -519,7 +530,9 @@ test.describe('Workspace entry and role navigation', () => {
       .getByLabel('Vendor authorization rationale', { exact: true })
       .fill('Supplier verified and authorized for synthetic purchases.');
     await change.getByRole('button', { name: 'Save status', exact: true }).click();
-    await expect(manager.getByRole('status')).toContainText('Vendor status recorded');
+    await expect(
+      manager.getByRole('status').filter({ hasText: 'Vendor status recorded' }),
+    ).toBeVisible();
     await manager.getByRole('button', { name: 'Back to purchase orders' }).click();
     await page.getByRole('button', { name: 'Create purchase order', exact: true }).click();
     await form

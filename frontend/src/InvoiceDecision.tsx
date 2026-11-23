@@ -1,7 +1,15 @@
 import { money, type Run } from './api';
 import { Icon, Link, reasonLabel, type Navigate } from './ui';
 
-export default function InvoiceDecision({ run, navigate }: { run: Run; navigate: Navigate }) {
+export default function InvoiceDecision({
+  run,
+  navigate,
+  onReview,
+}: {
+  run: Run;
+  navigate: Navigate;
+  onReview?: () => void;
+}) {
   const outcome = run.decision ?? run.job_state;
   const title =
     outcome === 'APPROVED'
@@ -26,7 +34,7 @@ export default function InvoiceDecision({ run, navigate }: { run: Run; navigate:
     (outcome === 'FAILED'
       ? 'A technical error stopped processing. This is not a financial rejection.'
       : outcome === 'QUEUED'
-        ? 'The PDF is stored and waiting for the configured worker.'
+        ? 'The PDF has been saved and is waiting for processing.'
         : outcome === 'RUNNING'
           ? 'Reading and checking the document. No approval has been recorded.'
           : outcome === 'INTERRUPTED'
@@ -112,11 +120,16 @@ export default function InvoiceDecision({ run, navigate }: { run: Run; navigate:
         </div>
       )}
       <div className="decision-actions">
-        {run.review_request_id && (
-          <a href="#human-review" className="button small">
-            Resolve exception <Icon name="arrow" size={15} />
-          </a>
-        )}
+        {run.review_request_id &&
+          (onReview ? (
+            <button className="button small" onClick={onReview}>
+              Resolve exception <Icon name="arrow" size={15} />
+            </button>
+          ) : (
+            <a href="#human-review" className="button small">
+              Resolve exception <Icon name="arrow" size={15} />
+            </a>
+          ))}
         {matched && (
           <Link to={'?po=' + run.purchase_order!.po_id} navigate={navigate} className="text-link">
             Inspect PO ledger →

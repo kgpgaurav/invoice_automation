@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.approval import ApprovalConflict, assess_transaction
 from app.evidence_verification import LEGACY_VERIFIER_VERSION, verify
-from app.extraction_schema import InvoiceExtractionV1
+from app.extraction_schema import parse_extraction
 from app.finance_rules import Result, reject, review
 from app.financial_models import ApprovalLedger, FinancialAssessment
 from app.models import Document, Run
@@ -85,11 +85,40 @@ def finalize_owned(worker, claim, *, post=True):
         document_row = session.get(Document, run.document_id)
         if hashlib.sha256(document_row.content).hexdigest() != run.document_sha256:
             raise ApprovalConflict("Stored document hash mismatch")
+        # The new mandatory scan gate also protects unposted legacy/review runs.
+        # Approved ledgers returned above remain immutable; old extraction and
+        # financial assessments are never rewritten merely to apply this gate.
+        from app.document_classification import scan_pages
+
+        if scan_pages(document_row.content):
+            result = review(
+                "SCANNED_DOCUMENT_REQUIRES_REVIEW",
+                "Scanned document requires human review, even when all fields verify.",
+            )
+            if post:
+                from app.events import append_event
+
+                run.reason = result.reason
+                append_event(
+                    session,
+                    run.id,
+                    f"scan-policy:{work.review_generation}",
+                    "DECISION_RECORDED",
+                    {"code": result.code, "decision": "NEEDS_REVIEW", "provisional": True},
+                    stage="EVIDENCE_VERIFICATION",
+                )
+            return result
         checked = verify(
-            InvoiceExtractionV1.model_validate(work.extraction_json),
+            parse_extraction(work.extraction_json, work.schema_version),
             document_row.content,
             version=work.verifier_version,
         )
+        from app.extended_verification import financial_conflicts
+
+        if financial_conflicts(checked):
+            return review(
+                "TAX_UNCLEAR", "Printed financial component values conflict; verify the source."
+            )
         selected_po, forced = None, None
         if work.review_generation:
             request = session.scalar(
@@ -131,11 +160,33 @@ def finalize_owned(worker, claim, *, post=True):
                     "Additional source information requested. No funds posted.",
                 )
         if checked.document is None:
+            if "SCANNED_DOCUMENT_REQUIRES_REVIEW" in checked.findings:
+                return forced or review(
+                    "SCANNED_DOCUMENT_REQUIRES_REVIEW",
+                    "Scanned document requires human review; no funds posted.",
+                )
             return forced or review(
                 "UNVERIFIED_TOTAL", "Critical source fields cannot be verified."
             )
         document = checked.document
         document_snapshot = document.model_dump(mode="json")
+        if work.schema_version == "InvoiceExtractionV1.2":
+            document_snapshot["extraction_schema_version"] = work.schema_version
+            document_snapshot["expanded_fields"] = {
+                p["field"]: {
+                    k: p.get(k)
+                    for k in (
+                        "original_value",
+                        "normalized_value",
+                        "state",
+                        "reason_code",
+                        "page",
+                        "calculation",
+                    )
+                }
+                for p in checked.provenance
+                if p["field"] not in {e.field for e in document.evidence}
+            }
         if work.verifier_version == LEGACY_VERIFIER_VERSION:
             document_snapshot.pop("verification_findings", None)
         fingerprint = hashlib.sha256(

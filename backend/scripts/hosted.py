@@ -129,6 +129,21 @@ def main():
                 engine, settings, os.environ["PS1_POLICY_VERSION"], rates=rates
             ) as processor:
                 processor.check_ready()
+                from app.evidence_verification import VERIFIER_VERSION
+                from app.extraction_schema import PROMPT_VERSION, SCHEMA_VERSION
+
+                print(
+                    json.dumps(
+                        dict(
+                            event="WORKER_READY",
+                            prompt_version=PROMPT_VERSION,
+                            schema_version=SCHEMA_VERSION,
+                            verifier_version=VERIFIER_VERSION,
+                            scan_review_required=True,
+                        )
+                    ),
+                    flush=True,
+                )
                 stop = Event()
                 signal.signal(signal.SIGINT, lambda *_: stop.set())
                 signal.signal(signal.SIGTERM, lambda *_: stop.set())

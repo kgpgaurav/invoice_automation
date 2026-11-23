@@ -1,16 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import {
-  api,
-  request,
-  errorMessage,
-  money,
-  dateTime,
-  type SubmitterRun,
-  type RunEvent,
-} from './api';
-import { Badge, Link, Mode, pretty, fieldLabel, type Navigate } from './ui';
-import BusinessTimeline from './BusinessTimeline';
-const PDFPreview = lazy(() => import('./PDFPreview'));
+import { useEffect, useState } from 'react';
+import { api, request, errorMessage, type SubmitterRun, type RunEvent } from './api';
+import { Link, type Navigate } from './ui';
+import InvoiceWorkspace from './InvoiceWorkspace';
 
 export default function SubmitterRunView({
   runId,
@@ -26,6 +17,7 @@ export default function SubmitterRunView({
     [error, setError] = useState(''),
     [pdf, setPdf] = useState(''),
     [pdfError, setPdfError] = useState('');
+  const [pdfVersion, setPdfVersion] = useState(0);
   useEffect(() => {
     setRun(null);
     setEvents([]);
@@ -80,128 +72,37 @@ export default function SubmitterRunView({
       controller.abort();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [runId, token]);
+  }, [runId, token, pdfVersion]);
   return (
     <>
-      <Link to="?view=history" navigate={navigate}>
-        ← Back to My invoices
-      </Link>
-      <div className="page-heading">
-        <div>
-          <h1>{run?.invoice_number ?? 'Invoice status'}</h1>
-          <p>Run {runId.slice(0, 8)}</p>
-        </div>
-        {run && <Badge value={run.decision ?? run.job_state} />}
+      <div className="invoice-breadcrumb">
+        <Link to="?view=history" navigate={navigate}>
+          ← Back to My invoices
+        </Link>
       </div>
       {error && (
         <div className="error" role="alert">
           {error}
         </div>
       )}
-      {run && (
-        <>
-          <section className="panel provider-panel">
-            <h2>{pretty(run.decision ?? run.job_state)}</h2>
-            <p>{run.decision_reason ?? 'Your invoice is waiting for processing.'}</p>
-            {run.decision && (
-              <p className="invoice-next-step">
-                {run.decision === 'APPROVED'
-                  ? 'Approved for payment processing. Finance will confirm the payment schedule.'
-                  : run.decision === 'REJECTED'
-                    ? 'This invoice is not approved for payment. See the reason.'
-                    : run.job_state === 'WAITING_REVIEW'
-                      ? 'A financial reviewer will review this invoice.'
-                      : 'Payment is not authorized. See the recorded outcome above.'}
-              </p>
-            )}
-            <Mode value={run.source_mode} />
-            <p>
-              Invoice amount:{' '}
-              <strong>{money(run.invoice_total, run.invoice_currency ?? '')}</strong>
-            </p>
-            {run.processing_failure && (
-              <div className="error">
-                <p>{run.processing_failure.message}</p>
-                <p>{run.processing_failure.next_action}</p>
-              </div>
-            )}
-            {run.job_state === 'WAITING_REVIEW' && (
-              <p>
-                A financial reviewer will handle this exception. You do not need to enter a reviewer
-                credential.
-              </p>
-            )}
-            <p>Last updated {dateTime(run.updated_at)}</p>
-            <p>
-              {run.source_mode === 'MOCK_OPENAI'
-                ? 'Prepared sample extraction'
-                : run.model_id === 'not-configured'
-                  ? 'Extraction not started'
-                  : `Model: ${run.model_id}`}{' '}
-              · Recorded requests: {run.usage.recorded_attempts} · Estimated API cost:{' '}
-              {run.usage.cost_status === 'not_applicable'
-                ? 'Not applicable (mock)'
-                : run.usage.estimated_cost_usd == null
-                  ? 'Unknown'
-                  : `US$${run.usage.estimated_cost_usd}`}
-            </p>
-          </section>
-          <BusinessTimeline
-            run={run}
-            events={events}
-            connection="Updates from saved processing records"
-            reconnect={() => {}}
-            technical={false}
-          />
-          <section className="panel provider-panel compact-extracted">
-            <h2>Extracted invoice information</h2>
-            <dl className="submitter-fields">
-              {run.fields
-                .filter((field) => field.required_for_approval !== false || field.value != null)
-                .map((field) => (
-                  <div key={field.field}>
-                    <dt>{fieldLabel(field.field)}</dt>
-                    <dd>
-                      {field.value ?? 'Missing'}{' '}
-                      <small>
-                        {field.verification === 'verified'
-                          ? field.origin === 'derived'
-                            ? 'Calculated from PDF values'
-                            : 'Matched to PDF'
-                          : field.verification === 'missing'
-                            ? 'Required information missing'
-                            : 'Source needs verification'}
-                      </small>
-                    </dd>
-                  </div>
-                ))}
-            </dl>
-            <details className="disclosure">
-              <summary>Optional fields not supplied</summary>
-              <p>
-                {run.fields
-                  .filter((field) => field.required_for_approval === false && field.value == null)
-                  .map((field) => fieldLabel(field.field))
-                  .join(', ') || 'None'}
-              </p>
-            </details>
-          </section>
-        </>
+      {!run ? (
+        <div className="panel empty-state" role="status">
+          <h1>Invoice status</h1>
+          <p>{error ? 'Invoice details could not be loaded.' : 'Reading invoice details…'}</p>
+        </div>
+      ) : (
+        <InvoiceWorkspace
+          run={run}
+          events={events}
+          pdf={pdf}
+          pdfError={pdfError}
+          audience="submitter"
+          connection="Updates from saved processing records"
+          reconnect={() => {}}
+          navigate={navigate}
+          retryPDF={() => setPdfVersion((value) => value + 1)}
+        />
       )}
-      <section className="panel provider-panel">
-        <h2>Your submitted PDF</h2>
-        {pdfError && <p role="alert">{pdfError}</p>}
-        {pdf && (
-          <>
-            <a href={pdf} target="_blank" rel="noreferrer">
-              Open PDF
-            </a>
-            <Suspense fallback={<p>Loading PDF preview…</p>}>
-              <PDFPreview url={pdf} />
-            </Suspense>
-          </>
-        )}
-      </section>
     </>
   );
 }

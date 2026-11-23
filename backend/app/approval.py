@@ -31,7 +31,7 @@ from app.financial_models import (
     PurchaseOrder,
     Vendor,
 )
-from app.models import QueueItem, Run
+from app.models import Document, QueueItem, Run
 from app.rule_trace import RuleTrace
 
 
@@ -134,6 +134,15 @@ def assess_transaction(
     policy = FinancialPolicy.model_validate(policy_row.config_json)
     trace = RuleTrace()
     result = forced_result or critical_check(document)
+    if forced_result is None:
+        from app.document_classification import scan_pages
+
+        source = session.get(Document, run.document_id)
+        if source is not None and scan_pages(source.content):
+            result = review(
+                "SCANNED_DOCUMENT_REQUIRES_REVIEW",
+                "Scanned document requires human review even when all fields verify.",
+            )
     if set(document.verification_findings) & {
         "ARITHMETIC_MISMATCH",
         "LINE_ARITHMETIC_MISMATCH",
@@ -184,7 +193,10 @@ def assess_transaction(
             )
         ).all()
         conflict = any(
-            FinancialDocument.model_validate(item.document_json).total_gross != document.total_gross
+            FinancialDocument.model_validate(
+                {k: v for k, v in item.document_json.items() if k in FinancialDocument.model_fields}
+            ).total_gross
+            != document.total_gross
             or item.document_json["invoice_date"] != snapshot["invoice_date"]
             or item.document_json["currency"] != document.currency
             for item in prior

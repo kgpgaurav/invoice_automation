@@ -1,6 +1,7 @@
 import json
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -114,14 +115,26 @@ def test_no_po_with_missing_tax_still_goes_to_review_without_paid_repair(workflo
     assert len(calls) == 1
 
 
-def test_frozen_legacy_review_survives_new_prompt_and_verifier(workflow_db, monkeypatch):
+@pytest.mark.parametrize(
+    "prompt,verifier",
+    [
+        ("invoice-extract-1", "labelled-fields-3"),
+        ("invoice-extract-2", "layout-grounding-4"),
+        ("invoice-extract-3", "layout-diagnostics-5"),
+        ("invoice-extract-3", "semantic-diagnostics-6"),
+        ("invoice-extract-4", "extended-diagnostics-7"),
+    ],
+)
+def test_frozen_legacy_review_survives_new_prompt_and_verifier(
+    workflow_db, monkeypatch, prompt, verifier
+):
     from app import workflow
     from tests.test_workflow_reviews import ambiguous, selection
 
     engine = workflow_db
     with monkeypatch.context() as old:
-        old.setattr(workflow, "PROMPT_VERSION", "invoice-extract-1")
-        old.setattr(workflow, "VERIFIER_VERSION", "labelled-fields-3")
+        old.setattr(workflow, "PROMPT_VERSION", prompt)
+        old.setattr(workflow, "VERIFIER_VERSION", verifier)
         ident, po_id, review_id, handler, calls = ambiguous(engine)
     respond(
         engine, review_id, selection(po_id), "legacy-normal-layout-upgrade", "configured-reviewer"
@@ -130,8 +143,5 @@ def test_frozen_legacy_review_survives_new_prompt_and_verifier(workflow_db, monk
     with Session(engine) as session:
         assert session.get(Run, ident).decision == "APPROVED"
         work = session.get(WorkflowRun, ident)
-        assert (
-            work.prompt_version == "invoice-extract-1"
-            and work.verifier_version == "labelled-fields-3"
-        )
+        assert work.prompt_version == prompt and work.verifier_version == verifier
     assert len(calls) == 1

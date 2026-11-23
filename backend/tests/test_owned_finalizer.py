@@ -5,6 +5,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.approval import ApprovalConflict, approve
+from app.evidence_verification import VERIFIER_VERSION
 from app.extraction_schema import PROMPT_VERSION, SCHEMA_VERSION
 from app.financial_models import ApprovalLedger, PurchaseOrder
 from app.intake import create_intake
@@ -28,6 +29,7 @@ def prepared(engine):
                 model_id="test-model",
                 prompt_version=PROMPT_VERSION,
                 schema_version=SCHEMA_VERSION,
+                verifier_version=VERIFIER_VERSION,
                 route="pdf",
                 extraction_json=wire.model_dump(),
             )

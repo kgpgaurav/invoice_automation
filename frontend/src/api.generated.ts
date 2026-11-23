@@ -517,6 +517,14 @@ export interface components {
             original_value?: string | null;
             /** Calculation */
             calculation?: string | null;
+            /** Extraction State */
+            extraction_state?: ("EXTRACTED" | "DERIVED" | "MISSING" | "AMBIGUOUS" | "UNVERIFIED") | null;
+            /** Source Reason Code */
+            source_reason_code?: string | null;
+            /** Source Reason */
+            source_reason?: string | null;
+            /** Financial Validation Errors */
+            financial_validation_errors?: string[] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -532,6 +540,14 @@ export interface components {
             status: "ok" | "ready" | "not_ready";
             /** Database */
             database?: ("ready" | "unavailable") | null;
+            /** Extraction Schema Version */
+            extraction_schema_version?: string | null;
+            /** Prompt Version */
+            prompt_version?: string | null;
+            /** Verifier Version */
+            verifier_version?: string | null;
+            /** Scan Review Required */
+            scan_review_required?: boolean | null;
         };
         /** IntakeResponse */
         IntakeResponse: {

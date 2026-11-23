@@ -31,7 +31,7 @@ def test_independently_evidenced_pdf_is_eligible_for_financial_assessment(databa
     )
     checked = verify(wire, pdf)
     assert checked.findings == ()
-    assert all(p["grounded"] for p in checked.provenance)
+    assert all(p["grounded"] for p in checked.provenance if p["state"] != "MISSING")
     engine = database[0]
     masters(engine)
     assert (

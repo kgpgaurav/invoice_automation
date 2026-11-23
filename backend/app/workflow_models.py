@@ -29,6 +29,7 @@ class WorkflowRun(Base):
     route: Mapped[str] = mapped_column(String(20))
     extraction_json: Mapped[dict | None] = mapped_column(JSON)
     extraction_history: Mapped[list] = mapped_column(JSON, default=list)
+    diagnostic_history: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     extraction_error: Mapped[str | None] = mapped_column(String(80))
     source_mode: Mapped[str] = mapped_column(String(30), default="LIVE_OPENAI")
     graph_version: Mapped[str] = mapped_column(String(80), default="invoice-graph-1")

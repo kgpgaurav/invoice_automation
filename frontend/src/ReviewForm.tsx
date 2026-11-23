@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, errorMessage, money, type Review, type ReviewBody } from './api';
 import { Icon, pretty } from './ui';
 export default function ReviewForm({
@@ -28,6 +28,7 @@ export default function ReviewForm({
     [busy, setBusy] = useState(false);
   const requestKey = useRef({ fingerprint: '', key: crypto.randomUUID() }),
     pending = useRef(false);
+  const rationaleId = useId();
   const credential = authorizedToken ?? reviewerToken;
   const ready = Boolean(action && credential && reason.trim() && (action !== 'SELECT_PO' || po));
   async function submit(e: FormEvent) {
@@ -180,17 +181,16 @@ export default function ReviewForm({
               </label>
             )}
           </div>
-          <label>
-            Review rationale
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              maxLength={500}
-              required
-              rows={2}
-              placeholder="Explain the supporting records or information needed."
-            />
-          </label>
+          <label htmlFor={rationaleId}>Review rationale</label>
+          <textarea
+            id={rationaleId}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={500}
+            required
+            rows={2}
+            placeholder="Explain the supporting records or information needed."
+          />
           <div className="review-submit">
             <p className="review-revalidation">
               <Icon name="info" size={17} />
