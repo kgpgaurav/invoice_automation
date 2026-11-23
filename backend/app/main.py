@@ -31,6 +31,7 @@ from app.contracts import (
 )
 from app.db import make_engine
 from app.demo_access import add_demo_access_route
+from app.demo_reset import add_demo_reset_routes
 from app.intake import create_intake, validate_pdf
 from app.models import RunEvent
 from app.po_routes import add_po_routes
@@ -91,6 +92,7 @@ def create_app(
         return require_role(actor, "reviewer")
 
     add_po_routes(app, engine, require_auth)
+    add_demo_reset_routes(app, settings, engine, require_auth)
 
     @app.get(f"{API_PREFIX}/access", response_model=AccessView)
     def get_access(actor: Annotated[Principal, Depends(require_auth)]):

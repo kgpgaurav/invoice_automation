@@ -47,6 +47,19 @@ def resolve_vendor(document, vendors, orders):
             and any(p.po_number == document.po_reference and p.vendor_id == v.id for p in orders)
         ]
     if len(matches) != 1:
+        po_vendors = [
+            v
+            for v in vendors
+            if any(p.po_number == document.po_reference and p.vendor_id == v.id for p in orders)
+        ]
+        if len(po_vendors) == 1 and document.vendor_tax_id is not None:
+            expected = po_vendors[0]
+            return None, review(
+                "VENDOR_UNKNOWN",
+                f"Invoice supplier tax ID {document.vendor_tax_id} does not match the "
+                f"vendor for {document.po_reference} (registered tax ID "
+                f"{expected.normalized_tax_id or 'not supplied'}). Verify supplier identity.",
+            )
         return None, review(
             "VENDOR_UNKNOWN", "Verify the supplier identity against the vendor master."
         )
@@ -110,6 +123,24 @@ def match_lines(document, lines):
 
 
 def critical_check(document: FinancialDocument):
+    if document.verification_findings:
+        codes = set(document.verification_findings)
+        if codes & {"ARITHMETIC_MISMATCH", "LINE_ARITHMETIC_MISMATCH", "HEADER_LINE_SUM_MISMATCH"}:
+            reason = "The printed invoice line amounts, tax and header totals do not reconcile."
+        elif "PRINTED_FIELD_OMITTED" in codes:
+            reason = (
+                "An identifier printed on the PDF was not extracted; "
+                "verify the source before matching."
+            )
+        else:
+            reason = (
+                "Required source values are missing, ambiguous or unsupported; "
+                "inspect the field checklist."
+            )
+        return review(
+            "UNVERIFIED_TOTAL",
+            reason,
+        )
     headers = (
         "vendor_name",
         "invoice_number",
@@ -158,18 +189,23 @@ def critical_check(document: FinancialDocument):
     verified = {e.field for e in document.evidence if e.verified}
     if not required <= verified:
         return review(
-            "UNVERIFIED_TOTAL", "Critical header or line fields lack verified source evidence."
+            "UNVERIFIED_TOTAL",
+            "PDF evidence could not verify: "
+            + ", ".join(
+                path.replace("lines.", "line ").replace("_", " ")
+                for path in sorted(required - verified)
+            ),
         )
     return None
 
 
-def evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date):
+def evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date, *, trace=None):
     with localcontext() as context:
         context.prec = 48
-        return _evaluate(document, vendor, po, lines, policy, today)
+        return _evaluate(document, vendor, po, lines, policy, today, trace)
 
 
-def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date):
+def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date, trace=None):
     """Return a provisional verdict and aggregated quantity allocation; never mutate masters."""
     error = critical_check(document)
     if error:
@@ -187,10 +223,18 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
         return review(
             "VENDOR_INACTIVE", "Supplier is inactive; verify its authorization before processing."
         ), {}
+    if trace:
+        trace.passed("VENDOR_STATUS", "The locked current vendor record is active.")
     if document.bank_account_last4 and document.bank_account_last4 != vendor.bank_last4:
         return review(
             "BANK_MISMATCH", "Verify the supplier's changed bank details. No funds were posted."
         ), {}
+    if trace and document.bank_account_last4:
+        trace.passed("BANK_DETAILS", "Printed bank-account suffix matches the vendor record.")
+    elif trace:
+        trace.rows["BANK_DETAILS"]["description"] = (
+            "Optional: no bank-account suffix is printed on this invoice."
+        )
     if po.status == "CANCELLED":
         return reject("PO_CLOSED", "The purchase order is confirmed cancelled."), {}
     if po.status != "OPEN" or (po.expires_at is not None and today > po.expires_at):
@@ -201,6 +245,10 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
         return review("FUTURE_DATE", "Verify the future invoice date."), {}
     if document.invoice_date < po.issued_at or po.issued_at > today:
         return review("DATE_BEFORE_PO", "Invoice date precedes the purchase order issue date."), {}
+    if trace:
+        trace.passed(
+            "PO_STATUS_DATE", "The locked PO is open, unexpired and valid for the invoice date."
+        )
     remaining = po.approved_cap_gross - po.committed_gross
     if document.total_gross > remaining:
         excess = document.total_gross - remaining
@@ -209,6 +257,12 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
             f"Invoice requests INR {document.total_gross:.2f}; PO remaining "
             f"INR {remaining:.2f}; excess INR {excess:.2f}. No funds were posted.",
         ), {}
+    if trace:
+        trace.passed(
+            "PO_BALANCE",
+            f"Invoice INR {document.total_gross:.2f} fits remaining INR {remaining:.2f}; "
+            "committed allocations were re-read under lock.",
+        )
     allocations, pairs, error = match_lines(document, lines)
     if error:
         return error, {}
@@ -247,6 +301,13 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
             return review(
                 "TAX_UNCLEAR", "Invoice line net, tax and gross amounts do not reconcile."
             ), {}
+    if trace:
+        trace.passed(
+            "PO_PRICE", "Every matched invoice net unit price satisfies its PO price rule."
+        )
+        trace.passed(
+            "TAX_RECONCILIATION", "Every matched line tax rate and amount reconciles with its PO."
+        )
     if (
         sum((line.net_amount for line in document.lines), Decimal("0")) != document.subtotal_net
         or sum((line.tax_amount for line in document.lines), Decimal("0")) != document.tax_total
@@ -255,11 +316,20 @@ def _evaluate(document, vendor, po, lines, policy: FinancialPolicy, today: date)
         return review(
             "ARITHMETIC_MISMATCH", "Invoice line sums and printed header totals do not reconcile."
         ), {}
+    if trace:
+        trace.passed(
+            "INVOICE_ARITHMETIC",
+            "Quantity × price, line totals, subtotal + tax and grand total reconcile.",
+        )
     for p in lines:
         if allocations.get(p.id, Decimal("0")) > p.quantity - p.committed_quantity:
             return review(
                 "QTY_EXCEEDED", "Invoice quantity exceeds the uncommitted PO-line quantity."
             ), {}
+    if trace:
+        trace.passed(
+            "PO_QUANTITY", "Aggregated invoice quantities fit the remaining locked PO lines."
+        )
     return Result(
         "APPROVED",
         "VALIDATED",

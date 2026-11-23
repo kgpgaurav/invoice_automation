@@ -25,6 +25,21 @@ class Settings(BaseSettings):
     access_mode: Literal["shared", "roles"] = "shared"
     submitter_api_tokens: dict[str, SecretStr] = {}
     public_demo_access: bool = False
+    demo_reset_enabled: bool = False
+
+    @model_validator(mode="after")
+    def reset_profile(self):
+        if self.demo_reset_enabled and (
+            self.access_mode != "roles"
+            or self.reviewer_api_token is None
+            or not self.database_schema
+            or self.database_schema in ("public", "information_schema")
+            or self.database_schema.startswith("pg_")
+        ):
+            raise ValueError(
+                "Demo reset requires role access and a dedicated nonpublic demo schema"
+            )
+        return self
 
     @model_validator(mode="after")
     def public_demo_profile(self):

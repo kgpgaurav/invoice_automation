@@ -153,6 +153,21 @@ def rule_checks(assessment, ledger, fields):
     Held assessments short-circuit. Do not reconstruct unrecorded earlier/later checks from
     their ordering or today's masters. This projection does not call evaluate().
     """
+    recorded = (getattr(assessment, "observations_json", None) or {}).get("rule_checks")
+    if recorded:
+        return [
+            RuleCheckView(
+                **row,
+                provenance="COMMITTED_VALIDATED_ASSESSMENT"
+                if ledger and assessment.decision == "APPROVED"
+                else "RECORDED_ASSESSMENT",
+                assessment_revision=assessment.revision,
+                pages=sorted({p for f in fields if f.verification == "verified" for p in f.pages})
+                if row["status"] == "passed"
+                else [],
+            )
+            for row in recorded
+        ]
     certified = bool(
         assessment
         and ledger
@@ -205,6 +220,41 @@ def rule_checks(assessment, ledger, fields):
                 finding_code=assessment.code,
             ),
         )
+    if assessment is None and fields:
+        missing = [
+            f.field.replace("lines.", "line ").replace("_", " ")
+            for f in fields
+            if f.required_for_approval and f.value in (None, "", "UNKNOWN")
+        ]
+        if not any(f.field.startswith(("lines.", "unidentified_lines.")) for f in fields):
+            missing.append("at least one invoice line")
+        unverified = [
+            f.field.replace("lines.", "line ").replace("_", " ")
+            for f in fields
+            if f.required_for_approval and f.value is not None and f.verification != "verified"
+        ]
+        result[:0] = [
+            RuleCheckView(
+                rule_id="REQUIRED_FIELDS",
+                title="Essential invoice fields",
+                status="requires_review" if missing else "passed",
+                description="Missing or unknown: " + ", ".join(missing)
+                if missing
+                else "Required values are present; source and financial checks are separate.",
+                provenance="LOCAL_SOURCE_INSPECTION",
+            ),
+            RuleCheckView(
+                rule_id="SOURCE_EVIDENCE",
+                title="Fields supported by the PDF",
+                status="requires_review" if unverified or missing else "passed",
+                description="PDF evidence needs verification: " + ", ".join(unverified)
+                if unverified
+                else "Resolve missing information before financial validation."
+                if missing
+                else "Required field values match local PDF evidence.",
+                provenance="LOCAL_SOURCE_INSPECTION",
+            ),
+        ]
     return result
 
 

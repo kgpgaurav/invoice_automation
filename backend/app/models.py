@@ -17,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app import (
+    demo_reset_model,  # noqa: F401
     extraction_store,  # noqa: F401
     financial_models,  # noqa: F401
     provider_models,  # noqa: F401

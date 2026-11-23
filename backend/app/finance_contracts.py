@@ -51,7 +51,7 @@ class Evidence(Contract):
     field: str
     raw_text: str = Field(min_length=1)
     page: int = Field(ge=1, le=5)
-    method: Literal["TEXT", "VISION"]
+    method: Literal["TEXT", "VISION", "DERIVED"]
     verified: bool = False
 
 
@@ -83,6 +83,7 @@ class FinancialDocument(Contract):
     bank_account_last4: str | None = Field(default=None, pattern=r"^[0-9]{4}$")
     lines: tuple[FinancialLine, ...] = ()
     evidence: tuple[Evidence, ...] = ()
+    verification_findings: tuple[str, ...] = ()
 
 
 class FinancialPolicy(Contract):

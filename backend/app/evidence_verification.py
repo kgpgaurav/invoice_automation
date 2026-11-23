@@ -1,177 +1,193 @@
-"""Conservative local field association and arithmetic checks; model evidence is untrusted."""
+"""Independently ground ordinary invoice layouts; preserve frozen legacy verification."""
 
 import re
-from dataclasses import dataclass
-from datetime import date
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, localcontext
 
 from pydantic import ValidationError
 
+from app.evidence_legacy import (  # Re-export helpers used by labelled fixture tooling.
+    ALIASES,  # noqa: F401
+    NUMERIC,
+    Verification,
+    labelled_records,
+    value_matches,  # noqa: F401
+)
+from app.evidence_legacy import verify as legacy_verify
 from app.extraction_schema import InvoiceExtractionV1
-from app.finance_contracts import Evidence, FinancialDocument, money
+from app.finance_contracts import Evidence, FinancialDocument, money, normalized_name
 from app.finance_rules import critical_check
 from app.pdf_input import inspect_pdf
+from app.source_layout import clean, inspect_layout, number
 
-ALIASES = {
-    "vendor name": "vendor_name",
-    "supplier": "vendor_name",
-    "vendor tax id": "vendor_tax_id",
-    "gstin": "vendor_tax_id",
-    "invoice number": "invoice_number",
-    "invoice no": "invoice_number",
-    "invoice date": "invoice_date",
-    "po reference": "po_reference",
-    "currency": "currency",
-    "subtotal net": "subtotal_net",
-    "net subtotal": "subtotal_net",
-    "tax total": "tax_total",
-    "total gross": "total_gross",
-    "amount due": "total_gross",
-    "tax mode": "tax_mode",
-    "bank account last4": "bank_account_last4",
-    "sku": "sku",
-    "description": "description",
-    "quantity": "quantity",
-    "unit price": "unit_price",
-    "price basis": "price_basis",
-    "tax rate": "tax_rate",
-    "net amount": "net_amount",
-    "tax amount": "tax_amount",
-    "gross amount": "gross_amount",
-    "po line no": "po_line_no",
-}
-NUMERIC = {
-    "subtotal_net",
+VERIFIER_VERSION = "layout-grounding-4"
+LEGACY_VERIFIER_VERSION = "labelled-fields-3"
+SUPPORTED_VERIFIERS = (LEGACY_VERIFIER_VERSION, VERIFIER_VERSION)
+DERIVABLE = {
+    "currency",
     "tax_total",
-    "total_gross",
-    "quantity",
-    "unit_price",
+    "tax_mode",
+    "price_basis",
     "tax_rate",
     "net_amount",
     "tax_amount",
     "gross_amount",
-    "po_line_no",
 }
-VERIFIER_VERSION = "labelled-fields-3"
 
 
-def labelled_records(pages):
-    records = {}
-    for page, text in enumerate(pages, 1):
-        for row in text.splitlines():
-            match = re.fullmatch(r"\s*(.*?)\s*:\s*(\S.*?)\s*", row)
-            if not match:
-                continue
-            label, value = match.groups()
-            line = re.fullmatch(r"Line ([1-9][0-9]*) (.+)", label, re.I)
-            name = ALIASES.get((line.group(2) if line else label).lower())
-            if name:
-                path = f"lines.{line.group(1)}.{name}" if line else name
-                records.setdefault(path, []).append((page, row, value))
-    return records
-
-
-def value_matches(field, value, source):
+def matches(path, value, source):
     if value is None:
         return False
-    if field.rsplit(".", 1)[-1] in NUMERIC:
-        if not re.fullmatch(
-            r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,2}(?:,[0-9]{2})*,[0-9]{3})(?:\.[0-9]+)?",
-            source,
-        ):
-            return False
-        try:
-            return Decimal(str(value)) == Decimal(source.replace(",", ""))
-        except InvalidOperation:
-            return False
-    return str(value) == source
+    name = path.rsplit(".", 1)[-1]
+    if name in NUMERIC:
+        return number(value) is not None and number(value) == number(source.value)
+    if path == "vendor_name" or name == "description":
+        return normalized_name(value) == normalized_name(source.value)
+    return clean(value) == clean(source.value)
 
 
-@dataclass(frozen=True)
-class Verification:
-    document: FinancialDocument | None
-    findings: tuple[str, ...]
-    provenance: tuple[dict, ...]
-
-    @property
-    def needs_review(self):
-        return bool(self.findings)
-
-
-def verify(extraction: InvoiceExtractionV1, pdf: bytes) -> Verification:
+def verify(extraction: InvoiceExtractionV1, pdf: bytes, *, version=VERIFIER_VERSION):
+    if version == LEGACY_VERIFIER_VERSION:
+        return legacy_verify(extraction, pdf)
+    if version != VERIFIER_VERSION:
+        raise ValueError("Unsupported frozen evidence verifier")
     local = inspect_pdf(pdf)
-    records = labelled_records(local.pages)
+    layout = inspect_layout(pdf, local.pages)
+    labels = labelled_records(local.pages)
+    if not layout.tables and {"vendor_name", "invoice_number", "total_gross"} <= labels.keys():
+        return legacy_verify(extraction, pdf)
     data = extraction.model_dump()
-    data["lines"] = data.pop("line_items")
     supplied = data.pop("evidence")
-    fields = {k: v for k, v in data.items() if k != "lines" and v is not None}
-    findings, provenance, evidence = [], [], []
-    for line in data["lines"]:
-        if (
-            line["line_no"] is None
-            or line["description"] is None
-            or line["price_basis"] not in ("NET", "GROSS")
-        ):
-            findings.append("CRITICAL_LINE_FIELD_MISSING")
-            continue
+    data["lines"] = data.pop("line_items")
+    # These indices identify extracted rows, not asserted printed numbering.
+    line_numbers = [line["line_no"] for line in data["lines"]]
+    aliases = {
+        str(line["line_no"]): str(index)
+        for index, line in enumerate(data["lines"], 1)
+        if line["line_no"] is not None and line_numbers.count(line["line_no"]) == 1
+    }
+    supplied = [
+        dict(
+            snippet,
+            field=".".join(
+                [
+                    "lines",
+                    aliases.get(snippet["field"].split(".")[1], snippet["field"].split(".")[1]),
+                    snippet["field"].split(".")[2],
+                ]
+            ),
+        )
+        if re.fullmatch(r"lines\.[1-9][0-9]*\.[a-z_]+", snippet["field"])
+        else snippet
+        for snippet in supplied
+    ]
+    for index, line in enumerate(data["lines"], 1):
+        line["line_no"] = index
+    fields = {key: value for key, value in data.items() if key != "lines"}
+    for index, line in enumerate(data["lines"], 1):
         fields.update(
-            {
-                f"lines.{line['line_no']}.{k}": v
-                for k, v in line.items()
-                if k != "line_no" and v is not None
-            }
+            {f"lines.{index}.{key}": value for key, value in line.items() if key != "line_no"}
         )
+    evidence, provenance, findings = [], [], []
     for path, value in fields.items():
-        candidates = records.get(path, [])
-        grounded = None
-        # Repeated/contradictory labels are ambiguous even if one equals the model output.
-        if len(candidates) == 1:
-            page, row, source = candidates[0]
-            for snippet in supplied:
-                raw = snippet["raw_text"]
-                masked_bank = (
-                    path == "bank_account_last4"
-                    and re.fullmatch(r"[0-9]{4}", source)
-                    and re.sub(r"[*Xx]+(?=[0-9]{4}\b)", "", raw) in row
-                )
-                if (
-                    snippet["field"] == path
-                    and snippet["page"] == page
-                    and raw.strip()
-                    and (raw in row or masked_bank)
-                    and value_matches(path, value, source)
-                ):
-                    grounded = (page, raw)
-                    break
-        provenance.append(
-            {
-                "field": path,
-                "grounded": grounded is not None,
-                "method": "TEXT" if grounded else "VISION_OR_UNGROUNDED",
-                "page": grounded[0] if grounded else None,
-            }
+        candidates = layout.records.get(path, [])
+        consistent = (
+            path == "vendor_name"
+            or len(
+                {
+                    number(s.value) if path.rsplit(".", 1)[-1] in NUMERIC else clean(s.value)
+                    for s in candidates
+                }
+            )
+            == 1
         )
+        source = layout.one(path)
+        recovered_printed = bool(
+            value is None and path == "subtotal_net" and source and not source.derived
+        )
+        if (
+            (
+                value is None
+                or value == "UNKNOWN"
+                or path == "currency"
+                and str(value).lower() in ("rs", "rs.", "₹", "indian rupee")
+            )
+            and source
+            and source.derived
+            and path.rsplit(".", 1)[-1] in DERIVABLE
+        ):
+            value = source.value
+            if path.startswith("lines."):
+                _, index, key = path.split(".")
+                data["lines"][int(index) - 1][key] = value
+            else:
+                data[path] = value
+        elif recovered_printed:
+            value = source.value
+            data[path] = value
+        grounded, used = None, None
+        if consistent and value is not None:
+            for source in candidates:
+                if not matches(path, value, source):
+                    continue
+                if source.derived or recovered_printed:
+                    grounded, used = source, source.text
+                    break
+                for snippet in supplied:
+                    raw = clean(snippet["raw_text"])
+                    masked = path == "bank_account_last4" and re.sub(
+                        r"[*Xx]+(?=[0-9]{4}\b)", "", raw
+                    ) in clean(source.text)
+                    if (
+                        snippet["field"] == path
+                        and snippet["page"] == source.page
+                        and raw
+                        and (raw in clean(source.text) or masked)
+                    ):
+                        grounded, used = source, snippet["raw_text"]
+                        break
+                if grounded:
+                    break
         if grounded:
+            if path == "bank_account_last4":
+                used = re.sub(r"[0-9]{5,}", lambda match: "****" + match.group()[-4:], used)
             evidence.append(
                 Evidence(
-                    field=path, page=grounded[0], raw_text=grounded[1], method="TEXT", verified=True
+                    field=path,
+                    raw_text=used,
+                    page=grounded.page,
+                    method="DERIVED" if grounded.derived else "TEXT",
+                    verified=True,
                 )
             )
-    # Optional means absent from the source, not permission for the model to drop
-    # a printed identifier and bypass bank, identity, PO or line matching checks.
-    if any(path not in fields for path in records):
-        findings.append("PRINTED_FIELD_OMITTED")
-    if not any(p.strip() for p in local.pages):
+        elif (
+            value is None
+            and candidates
+            and path in ("vendor_tax_id", "po_reference", "bank_account_last4")
+        ):
+            findings.append("PRINTED_FIELD_OMITTED")
+        elif value is None and candidates and path.endswith((".sku", ".po_line_no")):
+            findings.append("PRINTED_FIELD_OMITTED")
+        provenance.append(
+            dict(
+                field=path,
+                grounded=grounded is not None,
+                method="DERIVED"
+                if grounded and grounded.derived
+                else "TEXT"
+                if grounded
+                else "VISION_OR_UNGROUNDED",
+                page=grounded.page if grounded else None,
+                calculation=grounded.calculation if grounded else None,
+                pages=list(grounded.pages or (grounded.page,)) if grounded else [],
+            )
+        )
+    if not any(page.strip() for page in local.pages):
         findings.append("SCANNED_EVIDENCE_REQUIRES_REVIEW")
     if data["currency"] != "INR":
         findings.append("UNSUPPORTED_OR_MISSING_CURRENCY")
-    if data["tax_mode"] is None:
-        data["tax_mode"] = "UNKNOWN"
+    data["tax_mode"] = data["tax_mode"] or "UNKNOWN"
     data["evidence"] = evidence
     try:
-        # Explicit conversion, no computed defaults. Values remain null when not printed.
-        if data["invoice_date"] is not None:
-            date.fromisoformat(data["invoice_date"])
         document = FinancialDocument.model_validate(data)
     except (ValidationError, ValueError):
         return Verification(
@@ -190,15 +206,17 @@ def verify(extraction: InvoiceExtractionV1, pdf: bytes) -> Verification:
         sums = [Decimal("0"), Decimal("0"), Decimal("0")]
         complete = bool(document.lines)
         for line in document.lines:
-            values = (
-                line.quantity,
-                line.unit_price,
-                line.tax_rate,
-                line.net_amount,
-                line.tax_amount,
-                line.gross_amount,
-            )
-            if any(v is None for v in values):
+            if any(
+                v is None
+                for v in (
+                    line.quantity,
+                    line.unit_price,
+                    line.tax_rate,
+                    line.net_amount,
+                    line.tax_amount,
+                    line.gross_amount,
+                )
+            ):
                 complete = False
                 continue
             unit = (
@@ -212,22 +230,18 @@ def verify(extraction: InvoiceExtractionV1, pdf: bytes) -> Verification:
                 or line.gross_amount != line.net_amount + line.tax_amount
             ):
                 findings.append("LINE_ARITHMETIC_MISMATCH")
-            for i, value in enumerate((line.net_amount, line.tax_amount, line.gross_amount)):
-                sums[i] += value
+            for index, amount in enumerate((line.net_amount, line.tax_amount, line.gross_amount)):
+                sums[index] += amount
         if complete and tuple(sums) != (
             document.subtotal_net,
             document.tax_total,
             document.total_gross,
         ):
             findings.append("HEADER_LINE_SUM_MISMATCH")
-    if findings:
-        # A caller cannot bypass the verification report by passing its diagnostic
-        # document straight to the financial service: unresolved evidence is untrusted.
-        document = document.model_copy(
-            update={
-                "evidence": tuple(
-                    item.model_copy(update={"verified": False}) for item in document.evidence
-                )
-            }
-        )
+    blocking = set(findings)
+    if document.currency is not None:
+        # Scope is a financial check; a printed unsupported currency can still
+        # have correctly grounded source evidence. Never convert its value.
+        blocking.discard("UNSUPPORTED_OR_MISSING_CURRENCY")
+    document = document.model_copy(update={"verification_findings": tuple(sorted(blocking))})
     return Verification(document, tuple(sorted(set(findings))), tuple(provenance))

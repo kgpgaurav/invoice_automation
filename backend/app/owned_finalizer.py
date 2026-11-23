@@ -7,7 +7,7 @@ from decimal import localcontext
 from sqlalchemy import select
 
 from app.approval import ApprovalConflict, assess_transaction
-from app.evidence_verification import verify
+from app.evidence_verification import LEGACY_VERIFIER_VERSION, verify
 from app.extraction_schema import InvoiceExtractionV1
 from app.finance_rules import Result, reject, review
 from app.financial_models import ApprovalLedger, FinancialAssessment
@@ -86,7 +86,9 @@ def finalize_owned(worker, claim, *, post=True):
         if hashlib.sha256(document_row.content).hexdigest() != run.document_sha256:
             raise ApprovalConflict("Stored document hash mismatch")
         checked = verify(
-            InvoiceExtractionV1.model_validate(work.extraction_json), document_row.content
+            InvoiceExtractionV1.model_validate(work.extraction_json),
+            document_row.content,
+            version=work.verifier_version,
         )
         selected_po, forced = None, None
         if work.review_generation:
@@ -133,11 +135,14 @@ def finalize_owned(worker, claim, *, post=True):
                 "UNVERIFIED_TOTAL", "Critical source fields cannot be verified."
             )
         document = checked.document
+        document_snapshot = document.model_dump(mode="json")
+        if work.verifier_version == LEGACY_VERIFIER_VERSION:
+            document_snapshot.pop("verification_findings", None)
         fingerprint = hashlib.sha256(
             json.dumps(
                 [
                     work.policy_version,
-                    document.model_dump(mode="json"),
+                    document_snapshot,
                     str(selected_po) if selected_po else None,
                     forced.code if forced else None,
                 ],
@@ -156,7 +161,7 @@ def finalize_owned(worker, claim, *, post=True):
             document,
             work.policy_version,
             fingerprint,
-            document.model_dump(mode="json"),
+            document_snapshot,
             revision=work.review_generation,
             selected_po=selected_po,
             forced_result=forced,

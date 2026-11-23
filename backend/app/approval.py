@@ -32,6 +32,7 @@ from app.financial_models import (
     Vendor,
 )
 from app.models import QueueItem, Run
+from app.rule_trace import RuleTrace
 
 
 class ApprovalConflict(ValueError):
@@ -131,7 +132,21 @@ def assess_transaction(
     if policy_row is None:
         raise ApprovalConflict("Register an immutable policy version before assessment")
     policy = FinancialPolicy.model_validate(policy_row.config_json)
+    trace = RuleTrace()
     result = forced_result or critical_check(document)
+    if set(document.verification_findings) & {
+        "ARITHMETIC_MISMATCH",
+        "LINE_ARITHMETIC_MISMATCH",
+        "HEADER_LINE_SUM_MISMATCH",
+    }:
+        trace.rows["INVOICE_ARITHMETIC"].update(
+            status="requires_review",
+            finding_code="ARITHMETIC_MISMATCH",
+            description="Local PDF verification found inconsistent line, tax or header totals.",
+        )
+    if result is None:
+        trace.passed("REQUIRED_FIELDS", "All required invoice headers and line values are present.")
+        trace.passed("SOURCE_EVIDENCE", "Required values have locally verified PDF evidence.")
     allocations, vendor, po, observations = {}, None, None, None
     if result is None:
         vendors = session.scalars(select(Vendor)).all()
@@ -145,6 +160,10 @@ def assess_transaction(
             .execution_options(populate_existing=True)
         )
         vendor, result = resolve_vendor(document, [vendor], orders)
+        if result is None:
+            trace.passed(
+                "VENDOR_IDENTITY", f"Supplier matched {vendor.legal_name} in the vendor master."
+            )
     if vendor is not None and result is None:
         session.execute(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
@@ -190,6 +209,11 @@ def assess_transaction(
                 )
             )
         else:
+            trace.passed(
+                "DUPLICATE_IDENTITY",
+                "No conflicting or approved vendor/invoice identity exists; "
+                "invoice layouts are not compared.",
+            )
             if selected_po is None:
                 po, result = match_po(document, vendor, orders)
             else:
@@ -198,6 +222,8 @@ def assess_transaction(
                     result = review(
                         "PO_VENDOR_MISMATCH", "Selected PO is not valid for this supplier."
                     )
+            if po is not None and result is None:
+                trace.passed("PO_MATCH", f"{po.po_number} belongs to the verified supplier.")
     if po is not None and result is None:
         po = session.scalar(
             select(PurchaseOrder)
@@ -233,7 +259,9 @@ def assess_transaction(
                 )
             else:
                 today = session.scalar(text("SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date"))
-                result, allocations = evaluate(document, vendor, po, lines, policy, today)
+                result, allocations = evaluate(
+                    document, vendor, po, lines, policy, today, trace=trace
+                )
                 observations = {
                     "vendor_id": str(vendor.id),
                     "po_id": str(po.id),
@@ -251,6 +279,7 @@ def assess_transaction(
                 }
     if not post:
         return result
+    observations = dict(observations or {}, rule_checks=trace.stop(result))
     if result.decision == "APPROVED":
         invoice = Invoice(
             id=uuid4(),

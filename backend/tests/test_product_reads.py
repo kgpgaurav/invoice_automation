@@ -63,7 +63,8 @@ def test_po_reads_checklist_and_immutable_history(workflow_db, settings):
             assert client.get("/api/v1" + path).status_code == 401
         client.headers["Authorization"] = f"Bearer {TOKEN}"
         detail = client.get(f"/api/v1/runs/{run_id}").json()
-        assert len(detail["checks"]) == 7 and all(c["status"] == "passed" for c in detail["checks"])
+        assert len(detail["checks"]) == 13
+        assert all(c["status"] == "passed" for c in detail["checks"])
         assert all(c["provenance"] == "COMMITTED_VALIDATED_ASSESSMENT" for c in detail["checks"])
         first = client.get(f"/api/v1/purchase-orders/{po_id}").json()
         assert first["ledger_committed_gross"] == "11800.00"

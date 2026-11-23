@@ -124,6 +124,7 @@ def create(name, mode, url, *, roles=False):
         config.pop("OPENAI_MODEL", None)
     if roles:
         config["ACCESS_MODE"] = "roles"
+        config["DEMO_RESET_ENABLED"] = "true"
         config["SUBMITTER_API_TOKENS"] = json.dumps(
             {actor: secrets.token_urlsafe(32) for actor in ("submitter-b", "submitter-c")}
         )

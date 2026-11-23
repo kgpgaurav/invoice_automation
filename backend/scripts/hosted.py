@@ -1,4 +1,4 @@
-"""Explicit hosted commands; never provision accounts, seed demo masters or send payments."""
+"""Explicit hosted operations, including guarded synthetic master setup; never send payments."""
 
 import argparse
 import json
@@ -17,15 +17,34 @@ from app.db import make_engine
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "command", choices=("api", "migrate", "register-policy", "worker", "purge-credentials")
+        "command",
+        choices=("api", "migrate", "register-policy", "worker", "purge-credentials", "seed-demo"),
     )
     parser.add_argument("--confirm-policy-version")
+    parser.add_argument("--confirm-demo")
+    parser.add_argument("--confirm-schema")
+    parser.add_argument(
+        "--apply", action="store_true", help="Write the explicitly confirmed demo masters"
+    )
     args = parser.parse_args()
     # Render supplies a direct PostgreSQL URI; the app explicitly uses psycopg 3.
     url = os.environ.get("DATABASE_URL", "")
     if url.startswith("postgresql://"):
         os.environ["DATABASE_URL"] = "postgresql+psycopg://" + url.removeprefix("postgresql://")
-    settings = Settings()
+    if args.command == "seed-demo":
+        if not args.confirm_demo or not args.confirm_schema:
+            parser.error("seed-demo requires --confirm-demo and --confirm-schema")
+        try:
+            # A hosted seed reads the explicitly supplied process/environment-file
+            # values, never the unrelated local backend/.env.
+            settings = Settings(_env_file=None)
+        except Exception as error:
+            raise SystemExit(
+                f"Cannot load seed settings ({type(error).__name__}); "
+                "check configuration privately."
+            ) from None
+    else:
+        settings = Settings()
     if args.command == "api":
         import uvicorn
 
@@ -33,9 +52,36 @@ def main():
 
         uvicorn.run(create_app(settings), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
         return
-    engine = make_engine(settings)
     try:
-        if args.command == "migrate":
+        engine = make_engine(settings)
+    except Exception as error:
+        if args.command != "seed-demo":
+            raise
+        raise SystemExit(
+            f"Cannot initialize seed database ({type(error).__name__}); "
+            "check configuration privately."
+        ) from None
+    try:
+        if args.command == "seed-demo":
+            from scripts.seed_demo import SeedConflict, seed_demo
+
+            try:
+                report = seed_demo(
+                    engine,
+                    settings.database_schema,
+                    args.confirm_schema,
+                    args.confirm_demo,
+                    apply=args.apply,
+                )
+            except SeedConflict as error:
+                raise SystemExit(str(error)) from None
+            except Exception as error:
+                raise SystemExit(
+                    f"Demo setup stopped ({type(error).__name__}); "
+                    "inspect database configuration privately."
+                ) from None
+            print(json.dumps(report, indent=2))
+        elif args.command == "migrate":
             from app.checkpoints import setup_checkpoints
 
             config = Config(str(Path(__file__).parents[1] / "alembic.ini"))

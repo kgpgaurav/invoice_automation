@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy import String, and_, cast, func, or_, select
 
 from app.access import submitter_reason
-from app.evidence_verification import VERIFIER_VERSION, verify
+from app.evidence_verification import SUPPORTED_VERIFIERS, VERIFIER_VERSION, verify
 from app.extraction_schema import InvoiceExtractionV1
 from app.extraction_store import APIUsage
 from app.financial_models import ApprovalLedger, FinancialAssessment, PurchaseOrder, Vendor
@@ -27,6 +27,7 @@ from app.read_contracts import (
     UsageView,
     VendorView,
 )
+from app.review_comparisons import comparisons
 from app.workflow_models import ReviewRequest, WorkflowRun
 
 HEADERS = (
@@ -214,10 +215,14 @@ def detail(session, run):
     if wire:
         document = session.get(Document, run.document_id)
         if (
-            work.verifier_version == VERIFIER_VERSION
+            work.verifier_version in SUPPORTED_VERIFIERS
             and hashlib.sha256(document.content).hexdigest() == run.document_sha256
         ):
-            checked = verify(InvoiceExtractionV1.model_validate(wire), document.content)
+            checked = verify(
+                InvoiceExtractionV1.model_validate(wire),
+                document.content,
+                version=work.verifier_version,
+            )
             findings = list(checked.findings)
         else:
             findings = ["VERIFICATION_VERSION_OR_DOCUMENT_MISMATCH"]
@@ -227,8 +232,18 @@ def detail(session, run):
             else {}
         )
 
-        def field(path, value):
+        provenance = {p["field"]: p for p in checked.provenance} if checked else {}
+        normalized = (
+            checked.document.model_dump(mode="json") if checked and checked.document else {}
+        )
+
+        def field(path, value, original):
             evidence = verified.get(path)
+            local_source = (
+                provenance.get(path, {}) if work.verifier_version == VERIFIER_VERSION else {}
+            )
+            source_found = bool(evidence or local_source.get("grounded"))
+            source_page = evidence.page if evidence else local_source.get("page")
             fields.append(
                 ExtractedField(
                     field=path,
@@ -236,23 +251,38 @@ def detail(session, run):
                     verification="missing"
                     if value is None
                     else "verified"
-                    if evidence
+                    if source_found
                     else "unverified",
-                    pages=[evidence.page] if evidence else [],
+                    pages=local_source.get("pages") or ([source_page] if source_page else []),
+                    required_for_approval=path.rsplit(".", 1)[-1]
+                    not in ("vendor_tax_id", "sku", "po_line_no"),
+                    origin="derived"
+                    if local_source.get("method") == "DERIVED"
+                    else "printed"
+                    if source_found
+                    else None,
+                    original_value=str(original) if original is not None else None,
+                    calculation=local_source.get("calculation"),
                 )
             )
 
         for key in HEADERS:
-            field(key, wire.get(key))
+            field(key, normalized.get(key, wire.get(key)), wire.get(key))
         for index, line in enumerate(wire.get("line_items", []), 1):
-            number = line.get("line_no")
+            number = (
+                index
+                if work.verifier_version == VERIFIER_VERSION and normalized
+                else line.get("line_no")
+            )
             for key in LINE_FIELDS:
                 path = (
                     f"lines.{number}.{key}"
                     if number is not None
                     else f"unidentified_lines.{index}.{key}"
                 )
-                field(path, line.get(key))
+                lines = normalized.get("lines", [])
+                value = lines[index - 1].get(key) if index <= len(lines) else line.get(key)
+                field(path, value, line.get(key))
     vendor = (
         session.get(Vendor, assessment.vendor_id) if assessment and assessment.vendor_id else None
     )
@@ -328,6 +358,9 @@ def detail(session, run):
         checks=rule_checks(assessment, ledger, fields),
         business_explanation=EXPLANATIONS.get(reason_code),
         processing_failure=processing_failure(run, work, usage),
+        comparisons=comparisons(
+            session, fields, checked.document if checked else None, po, observations
+        ),
     )
 
 

@@ -87,18 +87,23 @@ def dataset():
     return [(name, pdf(data, scanned), data) for name, data, scanned in values]
 
 
+def master_records():
+    """Shared synthetic master definitions; values are not completed results."""
+    return (
+        ("Aster Office Supplies", "27ABCDE1234F1Z5", [("PO-001", "50000", "18")]),
+        ("Aster Industrial Supplies", "29ABCDE1234F1Z5", [("PO-PARTIAL", "100000", "0")]),
+        (
+            "Aster Technology Services",
+            "07ABCDE1234F1Z5",
+            [("PO-SELECT-001", "25000", "18"), ("PO-SELECT-002", "40000", "18")],
+        ),
+    )
+
+
 def seed(engine):
     register_policy(engine, FinancialPolicy(), "disposable-demo-setup")
     with Session(engine) as session, session.begin():
-        for name, tax, orders in (
-            ("Aster Office Supplies", "27ABCDE1234F1Z5", [("PO-001", "50000", "18")]),
-            ("Aster Industrial Supplies", "29ABCDE1234F1Z5", [("PO-PARTIAL", "100000", "0")]),
-            (
-                "Aster Technology Services",
-                "07ABCDE1234F1Z5",
-                [("PO-SELECT-001", "25000", "18"), ("PO-SELECT-002", "40000", "18")],
-            ),
-        ):
+        for name, tax, orders in master_records():
             vendor = Vendor(
                 id=uuid4(),
                 legal_name=name,

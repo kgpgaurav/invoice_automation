@@ -11,8 +11,8 @@ import httpx
 from pydantic import ValidationError
 
 from app.extraction_schema import (
-    INSTRUCTIONS,
     PROMPT_VERSION,
+    PROMPTS,
     SCHEMA_VERSION,
     InvoiceExtractionV1,
     output_format,
@@ -99,7 +99,10 @@ class OpenAIExtractor:
         before_attempt=lambda _: None,
         max_attempts=2,
         feedback=None,
+        prompt_version=PROMPT_VERSION,
     ):
+        if prompt_version not in PROMPTS:
+            raise ExtractionError("EXTRACTION_PROMPT_VERSION_UNSUPPORTED")
         if not 1 <= max_attempts <= 2:
             raise ExtractionError("EXTRACTION_ATTEMPTS_EXHAUSTED")
         local = inspect_pdf(pdf, route)
@@ -124,7 +127,7 @@ class OpenAIExtractor:
                     "/responses",
                     json={
                         "model": self.model,
-                        "instructions": INSTRUCTIONS + (feedback or "") + repair,
+                        "instructions": PROMPTS[prompt_version] + (feedback or "") + repair,
                         "store": False,
                         "max_output_tokens": 10000,
                         "text": {"format": output_format()},
@@ -173,7 +176,7 @@ class OpenAIExtractor:
                         "requested_model": self.model,
                         "usage": usage,
                         "latency_ms": int((time.monotonic() - started) * 1000),
-                        "prompt_version": PROMPT_VERSION,
+                        "prompt_version": prompt_version,
                         "schema_version": SCHEMA_VERSION,
                         "input_path": route + ":" + local.path_version,
                         "estimated_cost_usd": str(cost) if cost is not None else None,

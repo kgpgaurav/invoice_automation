@@ -10,9 +10,9 @@ from sqlalchemy import func, select
 
 from app.checkpoints import checkpoint_store
 from app.events import append_event
-from app.evidence_verification import VERIFIER_VERSION, verify
+from app.evidence_verification import SUPPORTED_VERIFIERS, VERIFIER_VERSION, verify
 from app.extraction_client import ExtractionError
-from app.extraction_schema import PROMPT_VERSION, SCHEMA_VERSION, InvoiceExtractionV1
+from app.extraction_schema import PROMPT_VERSION, PROMPTS, SCHEMA_VERSION, InvoiceExtractionV1
 from app.extraction_store import recorder
 from app.finance_rules import resolve_vendor
 from app.financial_models import PolicyVersion, PurchaseOrder, Vendor
@@ -112,7 +112,7 @@ class WorkflowProcessor:
                 config = (
                     self.policy_version,
                     self.extractor.model,
-                    PROMPT_VERSION,
+                    work.prompt_version if work else PROMPT_VERSION,
                     SCHEMA_VERSION,
                     self.route,
                     self.source_mode,
@@ -147,6 +147,7 @@ class WorkflowProcessor:
             with owned_session(worker, claim) as s:
                 work = s.get(WorkflowRun, claim.run_id)
                 remaining = 2 - work.extraction_attempts
+                prompt_version = work.prompt_version
                 if work.extraction_json is not None and (
                     not state.get("extraction_round") or not remaining
                 ):
@@ -201,6 +202,7 @@ class WorkflowProcessor:
                     self.rates,
                     before_attempt=reserve,
                     max_attempts=remaining,
+                    prompt_version=prompt_version,
                     feedback=(
                         "\nCritical evidence was unresolved. Re-read missing critical values "
                         "and their exact page snippets; never invent or compute source values."
@@ -231,8 +233,30 @@ class WorkflowProcessor:
                 work = s.get(WorkflowRun, claim.run_id)
                 wire = work.extraction_json
                 attempts = work.extraction_attempts
+                verifier_version = work.verifier_version
             if wire:
-                checked = verify(InvoiceExtractionV1.model_validate(wire), pdf)
+                checked = verify(
+                    InvoiceExtractionV1.model_validate(wire), pdf, version=verifier_version
+                )
+                if (
+                    verifier_version == VERIFIER_VERSION
+                    and wire.get("po_reference") is None
+                    and "PRINTED_FIELD_OMITTED" not in checked.findings
+                    and all(
+                        wire.get(field) is not None
+                        for field in (
+                            "vendor_name",
+                            "invoice_number",
+                            "invoice_date",
+                            "currency",
+                            "total_gross",
+                        )
+                    )
+                ):
+                    # A genuinely absent PO needs finance, not another paid attempt
+                    # to guess a reference. Missing identifying headers retain the
+                    # existing bounded source-repair attempt; no PO is inferred.
+                    return {"code": ""}
                 unresolved = set(checked.findings) & {
                     "CRITICAL_FIELD_MISSING",
                     "CRITICAL_LINE_FIELD_MISSING",
@@ -270,6 +294,7 @@ class WorkflowProcessor:
                         checked = verify(
                             InvoiceExtractionV1.model_validate(work.extraction_json),
                             s.get(Document, run.document_id).content,
+                            version=work.verifier_version,
                         )
                         if checked.document and checked.document.po_reference is None:
                             orders = s.scalars(select(PurchaseOrder)).all()
@@ -368,7 +393,8 @@ class WorkflowProcessor:
             run = s.get(Run, claim.run_id)
             work = s.get(WorkflowRun, claim.run_id)
             if work and (
-                work.graph_version != GRAPH_VERSION or work.verifier_version != VERIFIER_VERSION
+                work.graph_version != GRAPH_VERSION
+                or work.verifier_version not in SUPPORTED_VERIFIERS
             ):
                 raise ValueError("Graph/verifier version differs from the frozen run")
             if work and (
@@ -381,12 +407,14 @@ class WorkflowProcessor:
             ) != (
                 self.policy_version,
                 self.extractor.model,
-                PROMPT_VERSION,
+                work.prompt_version,
                 SCHEMA_VERSION,
                 self.route,
                 self.source_mode,
             ):
                 raise ValueError("Workflow configuration differs from the frozen run")
+            if work and work.prompt_version not in PROMPTS:
+                raise ValueError("Unsupported frozen extraction prompt")
             config = {"configurable": {"thread_id": str(run.thread_id)}}
             job_type = s.get(QueueItem, claim.job_id).work_type
         with checkpoint_store(self.engine, worker, claim) as saver, tracing_context(enabled=False):

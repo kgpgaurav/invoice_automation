@@ -175,6 +175,25 @@ def test_all_operations_with_three_submitters_and_financial_review(workflow_db, 
             if actor:
                 assert result.json()["actor_id"] == actor
 
+        for actor in actors:
+            preview = probe(
+                "GET",
+                "/demo/reset",
+                actor,
+                401 if actor is None else 200 if actor == "reviewer" else 403,
+            )
+            if actor == "reviewer":
+                assert preview.json()["enabled"] is False
+                assert preview.headers["cache-control"] == "no-store"
+            probe(
+                "POST",
+                "/demo/reset",
+                actor,
+                401 if actor is None else 403,
+                headers={"X-Idempotency-Key": "disabled-reset-matrix"},
+                json={"dataset": "ps1-demo-v1", "snapshot": "0" * 64, "confirmation": "RESET DEMO"},
+            )
+
         with Session(engine) as session:
             vendor_id = str(
                 session.scalar(
@@ -433,7 +452,7 @@ def test_all_operations_with_three_submitters_and_financial_review(workflow_db, 
             if method in {"get", "post", "delete", "put", "patch"}
         }
         assert observed == implemented
-        assert len(implemented) == 23
+        assert len(implemented) == 25
         for method, path in (
             ("GET", "/policies/current"),
             ("POST", "/policies"),

@@ -14,6 +14,10 @@ class ExtractedField(BaseModel):
     value: str | None
     verification: Literal["verified", "unverified", "missing"]
     pages: list[int]
+    required_for_approval: bool = True
+    origin: Literal["printed", "derived"] | None = None
+    original_value: str | None = None
+    calculation: str | None = None
 
 
 class VendorView(BaseModel):
@@ -71,6 +75,21 @@ class RuleCheckView(BaseModel):
     pages: list[int] = []
 
 
+class ReviewComparison(BaseModel):
+    field: str
+    title: str
+    invoice_value: str | None
+    expected_value: str | None
+    expected_label: str
+    status: Literal["matches", "different", "missing", "unverified", "information"]
+    source_verification: Literal["verified", "unverified", "missing"]
+    pages: list[int] = []
+    difference: str | None = None
+    currency: str | None = None
+    provenance: Literal["RECORDED_ASSESSMENT", "CURRENT_MASTER", "SOURCE_ONLY"]
+    description: str
+
+
 class ProcessingFailureView(BaseModel):
     code: Literal["MOCK_FIXTURE_NOT_FOUND", "BYOK_CREDENTIALS_UNAVAILABLE"]
     message: str
@@ -102,6 +121,7 @@ class RunDetail(RunStatus):
     checks: list[RuleCheckView] = []
     business_explanation: str | None = None
     processing_failure: ProcessingFailureView | None = None
+    comparisons: list[ReviewComparison] = []
 
 
 class RunSummary(BaseModel):
