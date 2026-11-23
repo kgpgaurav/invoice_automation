@@ -535,6 +535,76 @@ def table_sources(layout, spans):
         )
 
 
+def derive_header_tax_mode(layout):
+    """Derive exclusive tax from independently associated footer values."""
+    if layout.records.get("tax_mode"):
+        return
+
+    subtotal_source = layout.one("subtotal_net")
+    total_source = layout.one("total_gross")
+    component_source = layout.one("_header_tax_rate")
+    tax_source = layout.one("tax_total")
+
+    if not all((
+        subtotal_source,
+        total_source,
+        component_source,
+        tax_source,
+    )):
+        return
+
+    subtotal = layout.amount("subtotal_net")
+    total = layout.amount("total_gross")
+    tax = layout.amount("tax_total")
+
+    if any(v is None for v in (subtotal, total, tax)):
+        return
+
+    # Require an independently identified net subtotal,
+    # gross total and separately printed tax components.
+    if subtotal_source.derived or total_source.derived:
+        return
+
+    if not all((
+        "subtotal" in subtotal_source.text.lower().replace(" ", ""),
+        any(word in total_source.text.lower()
+            for word in ("total", "payable", "due")),
+        any(word in component_source.text.lower()
+            for word in ("cgst", "sgst", "igst", "gst")),
+    )):
+        return
+
+    if subtotal <= 0 or tax <= 0:
+        return
+
+    if subtotal + tax != total:
+        return
+
+    pages = tuple(sorted(set(
+        (subtotal_source.page, total_source.page)
+        + (component_source.pages or (component_source.page,))
+    )))
+
+    layout.add(
+        "tax_mode",
+        Source(
+            page=pages[0],
+            value="EXCLUSIVE",
+            text=(
+                subtotal_source.text + "\n"
+                + component_source.text + "\n"
+                + total_source.text
+            ),
+            derived=True,
+            calculation=(
+                f"Net subtotal {subtotal} + separately identified "
+                f"GST {tax} = gross total {total}"
+            ),
+            pages=pages,
+        ),
+    )
+
+
 def inspect_layout(pdf, pages):
     layout = Layout()
     with pymupdf.open(stream=pdf, filetype="pdf") as document:
@@ -576,4 +646,5 @@ def inspect_layout(pdf, pages):
         elif len(codes) > 1:
             for code in codes:
                 layout.add("currency", Source(page, code, code))
+    derive_header_tax_mode(layout)
     return layout

@@ -17,6 +17,7 @@ from app.source_layout import (
     source_date,
     spans_for,
     table_sources,
+    derive_header_tax_mode
 )
 from app.source_layout import (
     inspect_layout as old_layout,
@@ -408,6 +409,8 @@ def inspect_layout(pdf, pages):
                 else source
             )
         layout.records[path] = updated
-    for source in old.records.get("currency", []):
-        layout.add("currency", source)
-    return layout
+        for source in old.records.get("currency", []):
+            layout.add("currency", source)
+
+        derive_header_tax_mode(layout)
+        return layout
