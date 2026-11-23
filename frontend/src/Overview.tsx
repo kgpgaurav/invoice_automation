@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api, duration, errorMessage, money, type Summary } from './api';
 import { Link, type Navigate } from './ui';
-export default function Overview({ token, navigate }: { token: string; navigate: Navigate }) {
+import DemoReset from './DemoReset';
+export default function Overview({
+  token,
+  navigate,
+  canReset = false,
+}: {
+  token: string;
+  navigate: Navigate;
+  canReset?: boolean;
+}) {
   const [data, setData] = useState<Summary | null>(null),
     [error, setError] = useState(''),
     [revision, setRevision] = useState(0);
@@ -142,6 +151,7 @@ export default function Overview({ token, navigate }: { token: string; navigate:
           </section>
         </>
       )}
+      {canReset && <DemoReset token={token} onReset={() => setRevision((n) => n + 1)} />}
     </>
   );
 }

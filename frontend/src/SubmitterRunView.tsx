@@ -8,7 +8,7 @@ import {
   type SubmitterRun,
   type RunEvent,
 } from './api';
-import { Badge, Link, Mode, pretty, type Navigate } from './ui';
+import { Badge, Link, Mode, pretty, fieldLabel, type Navigate } from './ui';
 import BusinessTimeline from './BusinessTimeline';
 const PDFPreview = lazy(() => import('./PDFPreview'));
 
@@ -153,22 +153,38 @@ export default function SubmitterRunView({
             reconnect={() => {}}
             technical={false}
           />
-          <section className="panel provider-panel">
+          <section className="panel provider-panel compact-extracted">
             <h2>Extracted invoice information</h2>
             <dl className="submitter-fields">
-              {run.fields.map((field) => (
-                <div key={field.field}>
-                  <dt>
-                    {field.field.startsWith('lines.')
-                      ? `Line ${field.field.split('.')[1]} · ${pretty(field.field.split('.').slice(2).join('.'))}`
-                      : pretty(field.field)}
-                  </dt>
-                  <dd>
-                    {field.value ?? 'Missing'} · {field.verification}
-                  </dd>
-                </div>
-              ))}
+              {run.fields
+                .filter((field) => field.required_for_approval !== false || field.value != null)
+                .map((field) => (
+                  <div key={field.field}>
+                    <dt>{fieldLabel(field.field)}</dt>
+                    <dd>
+                      {field.value ?? 'Missing'}{' '}
+                      <small>
+                        {field.verification === 'verified'
+                          ? field.origin === 'derived'
+                            ? 'Calculated from PDF values'
+                            : 'Matched to PDF'
+                          : field.verification === 'missing'
+                            ? 'Required information missing'
+                            : 'Source needs verification'}
+                      </small>
+                    </dd>
+                  </div>
+                ))}
             </dl>
+            <details className="disclosure">
+              <summary>Optional fields not supplied</summary>
+              <p>
+                {run.fields
+                  .filter((field) => field.required_for_approval === false && field.value == null)
+                  .map((field) => fieldLabel(field.field))
+                  .join(', ') || 'None'}
+              </p>
+            </details>
           </section>
         </>
       )}

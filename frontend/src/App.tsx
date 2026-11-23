@@ -455,7 +455,7 @@ export default function App() {
               />
             </>
           ) : view === 'overview' ? (
-            <Overview token={token} navigate={navigate} />
+            <Overview token={token} navigate={navigate} canReset={access.role === 'reviewer'} />
           ) : view === 'purchase-orders' ? (
             <PurchaseOrders
               token={token}

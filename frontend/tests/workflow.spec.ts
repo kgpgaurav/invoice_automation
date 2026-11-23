@@ -65,7 +65,7 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await upload(page, 'H1');
     await approved(page);
     await expect(page.getByRole('heading', { name: 'Processing timeline' })).toBeVisible();
-    await expect(page.locator('.rule-check.passed')).toHaveCount(7);
+    await expect(page.locator('.rule-check.passed')).toHaveCount(13);
     cleanRun = new URL(page.url()).searchParams.get('run')!;
     await page.getByText('Extracted details', { exact: true }).click();
     await page.getByRole('button', { name: 'View Invoice Number source, page 1' }).click();
@@ -168,7 +168,18 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await expect(page.locator('[data-rule=PO_BALANCE] .check-status')).toHaveText(
       'Requires review',
     );
-    await expect(page.locator('.rule-check.passed')).toHaveCount(0);
+    await expect(page.locator('.rule-check.passed')).toHaveCount(8);
+    await expect(page.locator('[data-rule=PO_PRICE] .check-status')).toHaveText('Not checked');
+    await expect(page.locator('[data-rule=PO_BALANCE]')).toContainText('5000.00');
+    const comparisons = page.getByRole('region', { name: 'Invoice and PO comparison' });
+    await expect(comparisons).toContainText('Available at assessment');
+    await expect(comparisons).toContainText('35000');
+    await expect(comparisons).toContainText('30000');
+    await expect(comparisons).toContainText('₹5,000.00');
+    await expect(page.locator('.compact-progress .business-stage.has-issue')).toContainText(
+      'Needs review',
+    );
+    await expect(page.getByText('Stage details & timings', { exact: true })).toBeVisible();
     await expect(page.getByText('Polling fallback · every 2 seconds')).toBeVisible();
     await expect(page.getByRole('option', { name: 'Select PO & resume' })).toHaveCount(0);
     await capture(page, { path: resolve(shots, 'phase1-mock-overrun.png'), fullPage: true });
@@ -307,13 +318,11 @@ test.describe.serial('PDF-to-decision workspace', () => {
     await capture(page, { path: resolve(shots, 'phase1-scenarios.png'), fullPage: true });
   });
 
-  test('desktop, tablet and mobile layouts preserve the document and financial context', async ({
-    page,
-  }) => {
-    test.skip(live, 'No additional paid model calls in Phase 1');
-    await connect(page);
-    for (const width of [1440, 768, 390]) {
+  for (const width of [1440, 768, 390]) {
+    test(`layout at ${width}px preserves the document and financial context`, async ({ page }) => {
+      test.skip(live, 'No additional paid model calls in Phase 1');
       await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+      await connect(page);
       for (const [route, name] of [
         ['?run=' + cleanRun, 'approved'],
         ['?run=' + heldRun, 'overrun'],
@@ -348,8 +357,8 @@ test.describe.serial('PDF-to-decision workspace', () => {
       await page.getByRole('link', { name: 'Review queue', exact: false }).first().focus();
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/view=review/);
-    }
-  });
+    });
+  }
 
   test('keyboard landmarks, labels, focus, contrast and readable read failures', async ({
     page,

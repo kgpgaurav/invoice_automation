@@ -48,7 +48,9 @@ export async function request(path: string, token: string, init: RequestInit = {
     };
     throw new ApiError(
       response.status,
-      (['ROLE_FORBIDDEN', 'PO_CREATE_ERROR', 'VENDOR_ERROR'].includes(data?.detail?.code)
+      (['ROLE_FORBIDDEN', 'PO_CREATE_ERROR', 'VENDOR_ERROR', 'DEMO_RESET_CONFLICT'].includes(
+        data?.detail?.code,
+      )
         ? detail
         : messages[response.status]) ??
         detail ??

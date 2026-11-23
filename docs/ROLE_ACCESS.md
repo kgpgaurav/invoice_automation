@@ -28,6 +28,8 @@ New runs and provider sessions receive immutable server-derived ownership. Intak
 
 Shared compatibility mode retains its older broad inspection behavior and is not person-level isolation. It does not gain new vendor/PO spending authority. The scenario gallery is hidden in role mode.
 
+Only the actual reviewer role can use **Overview → Reset demo data**, and only when the operator explicitly enables the demo-reset feature in a dedicated schema. Submitters and shared compatibility credentials cannot preview or execute it. Confirmation deletes all shared demonstration submissions/history/approvals/custom masters and OpenAI connections, restoring the three-vendor/four-PO baseline; static app tokens remain. The action is not ordinary financial-history maintenance. See [the reset instructions](RUNNING.md#fixture-sequence).
+
 ## Personal credentials after deployment
 
 The operator configures distinct app tokens, the database and a stable API/worker encryption secret server-side. Submitters provide their own OpenAI key through the app; finance uses only its app token. The historical setting `OPENAI_CREDENTIAL_MODE=reviewer` refers to evaluator-supplied extraction credentials, not to the financial reviewer role.

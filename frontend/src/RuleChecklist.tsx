@@ -1,5 +1,5 @@
 import { money, type Run } from './api';
-import { Icon, reasonLabel } from './ui';
+import { Icon } from './ui';
 export default function RuleChecklist({ run }: { run: Run }) {
   const unknownLabels: Record<string, string> = {
     VENDOR_IDENTITY: 'Vendor identity',
@@ -10,17 +10,20 @@ export default function RuleChecklist({ run }: { run: Run }) {
     PO_QUANTITY: 'PO quantity allowance',
     PO_BALANCE: 'Available PO balance',
   };
-  const checks = [...run.checks].sort(
-    (a, b) =>
-      ({ failed: 0, requires_review: 1, passed: 2, not_evaluated: 3 })[a.status] -
-      { failed: 0, requires_review: 1, passed: 2, not_evaluated: 3 }[b.status],
-  );
+  const checks = run.checks;
+  const passed = checks.filter((c) => c.status === 'passed').length;
+  const issues = checks.filter(
+    (c) => c.status === 'failed' || c.status === 'requires_review',
+  ).length;
   return (
-    <section className="panel rule-panel" aria-label="Financial rule checklist">
+    <section className="panel rule-panel compact-checks" aria-label="Financial rule checklist">
       <div className="panel-heading">
         <div>
           <h2>Financial rule checklist</h2>
-          <p>Recorded results. An unknown check is never treated as a pass.</p>
+          <p>
+            {passed} passed · {issues} {issues === 1 ? 'issue' : 'issues'} ·{' '}
+            {checks.length - passed - issues} not checked
+          </p>
         </div>
       </div>
       <ul className="rule-list">
@@ -45,11 +48,9 @@ export default function RuleChecklist({ run }: { run: Run }) {
             <div>
               <div className="check-heading">
                 <strong>
-                  {check.status === 'failed' || check.status === 'requires_review'
-                    ? reasonLabel(check.finding_code)
-                    : check.status === 'not_evaluated'
-                      ? (unknownLabels[check.rule_id] ?? check.title)
-                      : check.title}
+                  {check.status === 'not_evaluated'
+                    ? (unknownLabels[check.rule_id] ?? check.title)
+                    : check.title}
                 </strong>
                 <span className="check-status">
                   {check.status === 'passed'
@@ -58,9 +59,14 @@ export default function RuleChecklist({ run }: { run: Run }) {
                       ? 'Failed'
                       : check.status === 'requires_review'
                         ? 'Requires review'
-                        : 'Not evaluated'}
+                        : check.description.startsWith('Optional:')
+                          ? 'Not supplied'
+                          : 'Not checked'}
                 </span>
               </div>
+              {(check.status === 'failed' || check.status === 'requires_review') && (
+                <p>{check.description}</p>
+              )}
               {check.rule_id === 'PO_BALANCE' &&
                 check.finding_code === 'PO_CAP_EXCEEDED' &&
                 run.decision_observations && (
@@ -75,7 +81,9 @@ export default function RuleChecklist({ run }: { run: Run }) {
                 )}
               <details>
                 <summary>Supporting record</summary>
-                <p>{check.description}</p>
+                {check.status !== 'failed' && check.status !== 'requires_review' && (
+                  <p>{check.description}</p>
+                )}
                 <small className="mono">
                   Rule {check.rule_id} · {check.provenance}
                   {check.assessment_revision != null
@@ -97,9 +105,8 @@ export default function RuleChecklist({ run }: { run: Run }) {
       <details className="disclosure table-note">
         <summary>How these checks are evidenced</summary>
         <p>
-          Passed checks are certified by the immutable VALIDATED assessment plus its committed
-          approval ledger. Individual check execution logs were not recorded. Held assessments
-          expose only their recorded finding.
+          Checks show the results captured at assessment. A skipped step has not been verified.
+          Historical records without individual results show only what was recorded at the time.
         </p>
       </details>
     </section>

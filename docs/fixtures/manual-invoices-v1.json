@@ -1,0 +1,425 @@
+{
+  "kind": "SYNTHETIC_MANUAL_INVOICE_PLAN",
+  "dataset": "ps1-demo-v1",
+  "notice": "Manual source data and expected test outcomes, not model output or completed processing.",
+  "common": {
+    "invoice_date": "2026-11-20",
+    "due_date": "2026-12-20",
+    "bill_to": "PS-1 Demo Company",
+    "currency": "INR",
+    "discounts": "0",
+    "shipping": "0",
+    "cess": "0",
+    "amount_paid": "0"
+  },
+  "purchase_orders": [
+    {
+      "vendor_name": "Aster Office Supplies",
+      "vendor_tax_id": "27ABCDE1234F1Z5",
+      "po_number": "PO-001",
+      "issued_at": "2026-10-01",
+      "currency": "INR",
+      "cap_gross": "50000",
+      "status": "OPEN",
+      "line": {
+        "sku": "PAPER",
+        "description": "Office paper",
+        "quantity": "100",
+        "unit_price": "1000",
+        "tax_rate": "18"
+      }
+    },
+    {
+      "vendor_name": "Aster Industrial Supplies",
+      "vendor_tax_id": "29ABCDE1234F1Z5",
+      "po_number": "PO-PARTIAL",
+      "issued_at": "2026-10-01",
+      "currency": "INR",
+      "cap_gross": "100000",
+      "status": "OPEN",
+      "line": {
+        "sku": "PAPER",
+        "description": "Office paper",
+        "quantity": "100",
+        "unit_price": "1000",
+        "tax_rate": "0"
+      }
+    },
+    {
+      "vendor_name": "Aster Technology Services",
+      "vendor_tax_id": "07ABCDE1234F1Z5",
+      "po_number": "PO-SELECT-001",
+      "issued_at": "2026-10-01",
+      "currency": "INR",
+      "cap_gross": "25000",
+      "status": "OPEN",
+      "line": {
+        "sku": "PAPER",
+        "description": "Office paper",
+        "quantity": "100",
+        "unit_price": "1000",
+        "tax_rate": "18"
+      }
+    },
+    {
+      "vendor_name": "Aster Technology Services",
+      "vendor_tax_id": "07ABCDE1234F1Z5",
+      "po_number": "PO-SELECT-002",
+      "issued_at": "2026-10-01",
+      "currency": "INR",
+      "cap_gross": "40000",
+      "status": "OPEN",
+      "line": {
+        "sku": "PAPER",
+        "description": "Office paper",
+        "quantity": "100",
+        "unit_price": "1000",
+        "tax_rate": "18"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "H1",
+      "suggested_filename": "H1-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27ABCDE1234F1Z5",
+        "invoice_number": "DEMO-HAPPY-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "10000.00",
+        "tax_total": "1800.00",
+        "total_gross": "11800.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "10",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "10000.00",
+            "tax_amount": "1800.00",
+            "gross_amount": "11800.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "APPROVED",
+        "code": "VALIDATED"
+      }
+    },
+    {
+      "id": "E1-prior",
+      "suggested_filename": "E1-prior-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Industrial Supplies",
+        "vendor_tax_id": "29ABCDE1234F1Z5",
+        "invoice_number": "DEMO-PART-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-PARTIAL",
+        "currency": "INR",
+        "subtotal_net": "70000.00",
+        "tax_total": "0.00",
+        "total_gross": "70000.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "70",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "0",
+            "net_amount": "70000.00",
+            "tax_amount": "0.00",
+            "gross_amount": "70000.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "APPROVED",
+        "code": "VALIDATED"
+      }
+    },
+    {
+      "id": "E1",
+      "suggested_filename": "E1-manual.pdf",
+      "depends_on": [
+        "E1-prior"
+      ],
+      "invoice": {
+        "vendor_name": "Aster Industrial Supplies",
+        "vendor_tax_id": "29ABCDE1234F1Z5",
+        "invoice_number": "DEMO-PART-002",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-PARTIAL",
+        "currency": "INR",
+        "subtotal_net": "35000.00",
+        "tax_total": "0.00",
+        "total_gross": "35000.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "35",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "0",
+            "net_amount": "35000.00",
+            "tax_amount": "0.00",
+            "gross_amount": "35000.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "PO_CAP_EXCEEDED"
+      }
+    },
+    {
+      "id": "E2",
+      "suggested_filename": "E2-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Technology Services",
+        "vendor_tax_id": "07ABCDE1234F1Z5",
+        "invoice_number": "DEMO-PO-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": null,
+        "currency": "INR",
+        "subtotal_net": "10000.00",
+        "tax_total": "1800.00",
+        "total_gross": "11800.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "10",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "10000.00",
+            "tax_amount": "1800.00",
+            "gross_amount": "11800.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "PO_AMBIGUOUS"
+      },
+      "review": {
+        "select_po": "PO-SELECT-001",
+        "reason": "Confirmed the supporting PO-SELECT-001 order record for this synthetic case.",
+        "expected_decision": "APPROVED"
+      }
+    },
+    {
+      "id": "E3",
+      "suggested_filename": "E3-manual.pdf",
+      "depends_on": [
+        "H1"
+      ],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27ABCDE1234F1Z5",
+        "invoice_number": "DEMO HAPPY 001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "10000.00",
+        "tax_total": "1800.00",
+        "total_gross": "11800.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "10",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "10000.00",
+            "tax_amount": "1800.00",
+            "gross_amount": "11800.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "REJECTED",
+        "code": "DUPLICATE_APPROVED"
+      }
+    },
+    {
+      "id": "E4",
+      "suggested_filename": "E4-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27ABCDE1234F1Z5",
+        "invoice_number": "DEMO-BANK-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "5000.00",
+        "tax_total": "900.00",
+        "total_gross": "5900.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "9876",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "5",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "5000.00",
+            "tax_amount": "900.00",
+            "gross_amount": "5900.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "BANK_MISMATCH"
+      }
+    },
+    {
+      "id": "GST",
+      "suggested_filename": "GST-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27AAAAA0000A1Z5",
+        "invoice_number": "DEMO-GST-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "2000.00",
+        "tax_total": "360.00",
+        "total_gross": "2360.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "2",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "2000.00",
+            "tax_amount": "360.00",
+            "gross_amount": "2360.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "VENDOR_UNKNOWN"
+      }
+    },
+    {
+      "id": "PRICE",
+      "suggested_filename": "PRICE-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27ABCDE1234F1Z5",
+        "invoice_number": "DEMO-PRICE-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "2010.00",
+        "tax_total": "361.80",
+        "total_gross": "2371.80",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "2",
+            "unit_price": "1005",
+            "price_basis": "NET",
+            "tax_rate": "18",
+            "net_amount": "2010.00",
+            "tax_amount": "361.80",
+            "gross_amount": "2371.80"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "PRICE_VARIANCE"
+      }
+    },
+    {
+      "id": "TAX",
+      "suggested_filename": "TAX-manual.pdf",
+      "depends_on": [],
+      "invoice": {
+        "vendor_name": "Aster Office Supplies",
+        "vendor_tax_id": "27ABCDE1234F1Z5",
+        "invoice_number": "DEMO-TAX-001",
+        "invoice_date": "2026-11-20",
+        "po_reference": "PO-001",
+        "currency": "INR",
+        "subtotal_net": "2000.00",
+        "tax_total": "240.00",
+        "total_gross": "2240.00",
+        "tax_mode": "EXCLUSIVE",
+        "bank_account_last4": "1234",
+        "line_items": [
+          {
+            "line_no": 1,
+            "sku": null,
+            "po_line_no": null,
+            "description": "Office paper",
+            "quantity": "2",
+            "unit_price": "1000",
+            "price_basis": "NET",
+            "tax_rate": "12",
+            "net_amount": "2000.00",
+            "tax_amount": "240.00",
+            "gross_amount": "2240.00"
+          }
+        ]
+      },
+      "expected_initial": {
+        "decision": "NEEDS_REVIEW",
+        "code": "TAX_UNCLEAR"
+      }
+    }
+  ]
+}

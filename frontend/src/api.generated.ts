@@ -91,6 +91,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview */
+        get: operations["preview_api_v1_demo_reset_get"];
+        put?: never;
+        /** Execute */
+        post: operations["execute_api_v1_demo_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access": {
         parameters: {
             query?: never;
@@ -488,6 +506,17 @@ export interface components {
             verification: "verified" | "unverified" | "missing";
             /** Pages */
             pages: number[];
+            /**
+             * Required For Approval
+             * @default true
+             */
+            required_for_approval: boolean;
+            /** Origin */
+            origin?: ("printed" | "derived") | null;
+            /** Original Value */
+            original_value?: string | null;
+            /** Calculation */
+            calculation?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -831,6 +860,58 @@ export interface components {
              */
             expires_at: string;
         };
+        /** ResetPreview */
+        ResetPreview: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Dataset
+             * @default ps1-demo-v1
+             */
+            dataset: string;
+            /** Snapshot */
+            snapshot?: string | null;
+            /**
+             * Counts
+             * @default {}
+             */
+            counts: {
+                [key: string]: number;
+            };
+        };
+        /** ResetRecorded */
+        ResetRecorded: {
+            /**
+             * Reset Id
+             * Format: uuid
+             */
+            reset_id: string;
+            /** Dataset */
+            dataset: string;
+            /** Removed Counts */
+            removed_counts: {
+                [key: string]: number;
+            };
+            /** Restored Counts */
+            restored_counts: {
+                [key: string]: number;
+            };
+        };
+        /** ResetRequest */
+        ResetRequest: {
+            /**
+             * Dataset
+             * @constant
+             */
+            dataset: "ps1-demo-v1";
+            /** Snapshot */
+            snapshot: string;
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: "RESET DEMO";
+        };
         /** ReviewAccepted */
         ReviewAccepted: {
             /**
@@ -865,6 +946,45 @@ export interface components {
             status: string;
             /** Remaining Gross */
             remaining_gross: string | null;
+        };
+        /** ReviewComparison */
+        ReviewComparison: {
+            /** Field */
+            field: string;
+            /** Title */
+            title: string;
+            /** Invoice Value */
+            invoice_value: string | null;
+            /** Expected Value */
+            expected_value: string | null;
+            /** Expected Label */
+            expected_label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matches" | "different" | "missing" | "unverified" | "information";
+            /**
+             * Source Verification
+             * @enum {string}
+             */
+            source_verification: "verified" | "unverified" | "missing";
+            /**
+             * Pages
+             * @default []
+             */
+            pages: number[];
+            /** Difference */
+            difference?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "RECORDED_ASSESSMENT" | "CURRENT_MASTER" | "SOURCE_ONLY";
+            /** Description */
+            description: string;
         };
         /** ReviewPayload */
         ReviewPayload: {
@@ -1013,6 +1133,11 @@ export interface components {
             /** Business Explanation */
             business_explanation?: string | null;
             processing_failure?: components["schemas"]["ProcessingFailureView"] | null;
+            /**
+             * Comparisons
+             * @default []
+             */
+            comparisons: components["schemas"]["ReviewComparison"][];
         };
         /** RunEventResponse */
         RunEventResponse: {
@@ -1503,6 +1628,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["POCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_v1_demo_reset_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetPreview"];
+                };
+            };
+        };
+    };
+    execute_api_v1_demo_reset_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetRecorded"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetRecorded"];
                 };
             };
             /** @description Validation Error */

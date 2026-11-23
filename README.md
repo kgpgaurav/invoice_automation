@@ -77,6 +77,10 @@ One OpenAI connection can serve multiple invoices in the same tab for up to 24 h
 
 OpenAI extracts a reference printed on the invoice. Python verifies the vendor, exact reference, dates, line/tax terms, duplicate identity and available PO funds. A missing or ambiguous reference goes to finance; the model does not invent a supporting PO or grant approval. Unsupported currency stays visible and requires review; only INR can authorize an approval.
 
+New runs support ordinary text invoice tables with common header/column names, including numbered or unnumbered rows, stacked GST cells, percentage columns and single-line footer tax. They do not need the demo's labelled Notes format. Local PDF text/geometry checks source associations, distinguishes supplier from buyer GSTIN, and records source-supported Decimal calculations separately from printed values. The original OpenAI response remains unchanged. Missing tax evidence, unfamiliar/ambiguous layouts and scans without local text still require review; this is not a claim that every commercial layout can auto-approve.
+
+Invoices are checked against registered vendors and their referenced POs. Previously processed invoices are consulted only for duplicate identities and the PO's committed allocations; their PDF layouts are not extraction templates. The prepared demo PDFs are test inputs, not an allowlist for live processing.
+
 Explicit mock workspaces need no personal key and accept only their generated fixture PDFs. They are visibly labelled and never call OpenAI. Normal uploads do not silently fall back to mock responses.
 
 ## Review an exception
@@ -88,6 +92,12 @@ Explicit mock workspaces need no personal key and accept only their generated fi
 5. If the evidence cannot resolve the issue, use **Request source information & stop** or rejection when offered. There is no action to waive a spending cap, approve an unknown tax treatment or execute payment.
 
 Open **Invoice history** for completed/failed runs and **Overview** for aggregate recorded activity. Empty results, technical failures and financial rejection are distinct. Missing usage/cost is shown as unknown; a dated token-cost estimate is not an account billing receipt.
+
+The financial checklist shows 13 recorded steps, including essential fields, source evidence, supplier identity/status, bank details, duplicates, PO matching/dates, arithmetic, tax, price, quantity and available funds. **Not checked** explains which prerequisite stopped validation; it never means passed. Optional SKU/PO-line references are labelled optional. Extracted-field details distinguish printed values from locally calculated values and show the calculation. Older records keep their original verifier and historical check evidence; an updated application does not rewrite an old decision.
+
+Progress/checks use compact rows, with timings and supporting audit details in disclosures. **What needs checking** shows invoice values beside the vendor/PO values, source verification and exact differences. Current master context is labelled separately from recorded assessment-time balances. The [exact OpenAI prompt and field-storage guide](docs/EXTRACTION.md) explains the PDF request and retained extraction/financial data.
+
+In an explicitly enabled assignment workspace, a reviewer can use **Overview → Reset demo data**. Review the deletion counts and type **RESET DEMO** to permanently clear all workspace invoices, PDFs, reviews, approvals, custom vendors/POs and OpenAI connections. It restores three demo vendors/four POs with no allocations; static login tokens remain. Busy workers and changed previews block reset. The feature defaults off, needs migration **0011_demo_reset** plus `DEMO_RESET_ENABLED=true` with role mode and a dedicated nonpublic schema, and retains immutable reset receipts so retrying a lost response cannot delete newer submissions. Sharing a public reviewer token shares this reset capability when enabled. This is a destructive demo feature, not normal financial-history maintenance.
 
 ## Manage vendors and purchase orders
 
@@ -158,7 +168,11 @@ The financial decision is separate from job progress. No payout date is promised
 
 ## Demo scenarios
 
+To create your own PDFs, follow the [exact manual invoice fields and reset steps](docs/DEMO_INVOICES.md): one happy path, four primary edge cases and three additional GST/price/tax exceptions, all using the prepared four POs. The sheet includes every amount, supplier GSTIN, prerequisite and expected balance.
+
 Generate synthetic PDFs using the [local demo instructions](docs/RUNNING.md). These cases depend on their prepared masters and predecessor invoices; do not silently reset shared history or reuse an approved identity expecting another approval.
+
+For a hosted workspace with no vendors or purchase orders, the operator can use the [guarded master-data setup](docs/RUNNING.md#populate-hosted-demo-masters). It adds three synthetic vendors and four POs with creation audit, and registers the unchanged demo policy if absent. It does not seed completed invoices or decisions; upload the PDFs to run those cases.
 
 | Case                              | What to demonstrate                                                                                                                                                                  |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -201,13 +215,14 @@ Model calls run outside database transactions. Financial posting uses a short lo
 
 Follow [RUNNING.md](docs/RUNNING.md) for Windows CMD prerequisites, PostgreSQL, dependencies, and separate API/worker/frontend terminals. The role-separated personal-key profile uses `--mode reviewer --roles`; the configuration word `reviewer` is historical and does not mean finance needs an OpenAI key. Use a separate, explicitly labelled mock workspace for charge-free fixture testing.
 
-The latest application milestone recorded **312 backend tests passing**, three opt-in live skips, and **35 browser cases passing** across role/shared runs on 18 November 2026. Ruff, migration roundtrips/metadata parity, generated API checks and the frontend build passed. These are local results, not hosted processing acceptance. [DEVELOPMENT.md](docs/DEVELOPMENT.md) gives reproducible commands and limitations; [benchmark evidence](docs/benchmarks/README.md) distinguishes token-cost estimates from actual billing.
+The latest verification completed **23 November 2026** with **400 backend tests passing** and three opt-in live skips, including 27 demo-reset cases, nine review-comparison cases and every earlier regression/migration check. **38 browser cases passed** across separate role and shared/provider/workflow suites; the endpoint matrix covers all **25 implemented operations**. Ruff, reproducible OpenAPI/TypeScript generation, frontend formatting and the production build passed. These are local results, not hosted processing acceptance; no new paid model call was made. [DEVELOPMENT.md](docs/DEVELOPMENT.md) records files, initial failures/fixes, commands and limitations; [benchmark evidence](docs/benchmarks/README.md) distinguishes token-cost estimates from actual billing.
 
 ## Deployment status
 
-The frontend/API entry is hosted at [invoiceautomation-seven.vercel.app](https://invoiceautomation-seven.vercel.app/) with Supabase PostgreSQL. Earlier public checks confirmed the access screen, DM Sans and HTTP availability; this documentation update does not repeat or extend that hosted acceptance.
+The frontend/API entry is hosted at [invoiceautomation-seven.vercel.app](https://invoiceautomation-seven.vercel.app/) with Supabase PostgreSQL. On **22 November 2026**, guarded operator setup added the prepared synthetic masters; the authenticated public API confirmed **three vendors and four purchase orders**, with zero allocations on the new orders. Existing invoice/queue/approval table counts and the immutable policy were preserved. Earlier public checks confirmed the access screen, DM Sans and HTTP availability. These checks do not prove hosted invoice processing or worker recovery.
 
-- The working tree includes the public demo-access and vendor/PO/totals extensions. Hosted availability requires deploying the corresponding frontend/API, running migrations through **0010_vendor_management**, and updating the worker.
+- Hosted master setup verified migrations through **0010_vendor_management**. Subsequent application updates still require the corresponding frontend/API and worker versions; running setup from a local checkout does not deploy code.
+- The ordinary-layout verifier, compact review and reset controls are local, uncommitted changes awaiting review/deployment. Existing hosted records retain their original verifier; a fresh submission after updating both API and worker exercises the new path. Layout/comparison changes need no migration; demo reset adds **0011_demo_reset** and requires its explicit enable flag.
 - The Vercel manifest leaves the persistent worker disabled at zero instances by default. The operator must deliberately activate it and supply reviewed policy/vendor/PO data. UI/API/database readiness alone does not prove processing works.
 - Hosted upload boundaries, worker recovery, session-preserving PostgreSQL locks, quotas and an end-to-end real-invoice rehearsal remain separate acceptance gates. Personal deployment credentials/runbooks are local-only.
 

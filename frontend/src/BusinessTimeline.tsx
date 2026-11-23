@@ -1,5 +1,5 @@
 import { dateTime, duration, type Run, type RunEvent } from './api';
-import { pretty } from './ui';
+import { Icon, pretty } from './ui';
 const steps = [
   ['DOCUMENT_LOADING', 'Read document', 'Open and validate the stored PDF.'],
   [
@@ -31,25 +31,59 @@ export default function BusinessTimeline({
   reconnect,
   technical = true,
 }: {
-  run: Pick<Run, 'stages' | 'job_state' | 'source_mode'>;
+  run: Pick<Run, 'stages' | 'job_state' | 'source_mode'> &
+    Partial<Pick<Run, 'decision' | 'decision_reason' | 'reason_code' | 'error_code' | 'checks'>>;
   events: RunEvent[];
   connection: string;
   reconnect: () => void;
   technical?: boolean;
 }) {
+  const needsReview = run.job_state === 'WAITING_REVIEW';
+  const issue = needsReview || run.job_state === 'FAILED';
+  const sourceIssue = run.checks?.some(
+    (check) =>
+      ['REQUIRED_FIELDS', 'SOURCE_EVIDENCE'].includes(check.rule_id) &&
+      ['requires_review', 'failed'].includes(check.status),
+  );
+  const code = run.reason_code ?? '';
+  const issueStage =
+    sourceIssue || ['UNVERIFIED_TOTAL', 'CRITICAL_FIELD_MISSING'].includes(code)
+      ? 'EVIDENCE_VERIFICATION'
+      : code.startsWith('VENDOR_') ||
+          [
+            'PO_MISSING',
+            'PO_AMBIGUOUS',
+            'PO_VENDOR_MISMATCH',
+            'DUPLICATE_APPROVED',
+            'DUPLICATE_CONFLICT',
+          ].includes(code)
+        ? 'MATCHING'
+        : run.job_state === 'FAILED'
+          ? (run.stages.filter((stage) => stage.status !== 'finished').at(-1)?.name ?? 'EXTRACTION')
+          : 'FINALIZATION';
+  const details: {
+    title: string;
+    at: string | undefined;
+    total: number | null;
+    count: number;
+    explanation: string;
+  }[] = [];
   return (
-    <section className="panel timeline-panel">
+    <section className="panel timeline-panel compact-progress">
       <div className="panel-heading">
         <div>
           <h2>Processing timeline</h2>
-          <p>
-            {technical
-              ? 'Actual recorded execution · completion of a stage is not a passed financial check.'
-              : 'Processing updates recorded for your invoice.'}
-          </p>
+          <p>Recorded progress. Completed stages can still find an issue.</p>
         </div>
         <span className="stream-state">{connection}</span>
       </div>
+      {issue && (
+        <p className="progress-issue" role="note">
+          <Icon name="alert" size={16} />
+          {needsReview ? 'Needs review' : 'Processing failed'}:{' '}
+          {run.decision_reason ?? 'See the recorded issue above.'}
+        </p>
+      )}
       <ol className="business-timeline">
         {steps.map(([key, title, explanation], index) => {
           const rows = run.stages.filter((stage) => stage.name === key),
@@ -64,63 +98,72 @@ export default function BusinessTimeline({
           const interrupted =
             last?.status === 'running' &&
             ['FAILED', 'INTERRUPTED', 'WAITING_REVIEW'].includes(run.job_state);
-          const status = decision
-            ? 'Recorded'
-            : last
-              ? interrupted
-                ? 'Interrupted'
-                : last.status === 'finished'
-                  ? 'Completed'
-                  : 'In progress'
-              : 'Not recorded';
+          const status =
+            key === issueStage && issue
+              ? needsReview
+                ? 'Needs review'
+                : 'Failed'
+              : key === 'DECISION' && needsReview
+                ? 'Awaiting review'
+                : decision
+                  ? 'Recorded'
+                  : last
+                    ? interrupted
+                      ? 'Interrupted'
+                      : last.status === 'finished'
+                        ? 'Completed'
+                        : 'In progress'
+                    : 'Not recorded';
           const at = decision?.occurred_at ?? last?.finished_at ?? last?.started_at;
+          details.push({ title, at, total, count: rows.length, explanation });
           return (
             <li
               key={key}
               className={
                 'business-stage ' +
-                (status === 'Completed' || status === 'Recorded'
-                  ? 'complete'
-                  : status === 'In progress'
-                    ? 'current'
-                    : '')
+                (status === 'Needs review' || status === 'Failed'
+                  ? 'has-issue'
+                  : status === 'Completed' || status === 'Recorded'
+                    ? 'complete'
+                    : status === 'In progress'
+                      ? 'current'
+                      : '')
               }
               data-stage={key}
             >
-              <span className="stage-index">{index + 1}</span>
+              <span className="stage-index" aria-hidden="true">
+                {status === 'Completed' || status === 'Recorded' ? (
+                  <Icon name="check" size={13} />
+                ) : (
+                  index + 1
+                )}
+              </span>
               <div>
                 <div className="stage-heading">
                   <strong>{title}</strong>
                   <span>{status}</span>
                 </div>
-                <p>
-                  {technical
-                    ? explanation
-                    : [
-                        'Read your submitted PDF.',
-                        'Extract the printed invoice information.',
-                        'Check required fields and totals.',
-                        'Verify supplier and purchase-order information.',
-                        'Check the invoice against purchasing requirements.',
-                        'Save the invoice outcome.',
-                      ][index]}
-                </p>
-                <small>
-                  {at ? <time dateTime={at}>{dateTime(at)}</time> : 'No execution event recorded'}
-                  {total != null ? ' · ' + duration(total) : ''}
-                  {rows.length > 1 ? ' · ' + rows.length + ' recorded executions' : ''}
-                </small>
-                {technical && key === 'DECISION' && decision && (
-                  <small>
-                    Assessment recorded; see the current outcome above. Decision write shares the
-                    financial transaction; no separate duration is measured.
-                  </small>
-                )}
               </div>
             </li>
           );
         })}
       </ol>
+      <details className="disclosure stage-details">
+        <summary>Stage details & timings</summary>
+        <ul>
+          {details.map((item) => (
+            <li key={item.title}>
+              <strong>{item.title}</strong>
+              <span>
+                {item.at ? dateTime(item.at) : 'No execution event recorded'}
+                {item.total != null && ' · ' + duration(item.total)}
+                {item.count > 1 && ' · ' + item.count + ' recorded executions'}
+              </span>
+              {technical && <p>{item.explanation}</p>}
+            </li>
+          ))}
+        </ul>
+      </details>
       {technical && (
         <details className="disclosure technical-events">
           <summary>Technical audit events ({events.length})</summary>

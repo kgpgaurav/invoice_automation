@@ -53,6 +53,33 @@ export const pretty = (value: string) =>
     .toLowerCase()
     .replaceAll('_', ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+export const fieldLabel = (path: string) => {
+  const parts = path.split('.');
+  const key = parts.at(-1) ?? path;
+  const names: Record<string, string> = {
+    vendor_name: 'Supplier name',
+    vendor_tax_id: 'Supplier GSTIN / tax ID',
+    invoice_number: 'Invoice number',
+    invoice_date: 'Invoice date',
+    po_reference: 'Purchase order reference',
+    currency: 'Currency',
+    subtotal_net: 'Subtotal before tax',
+    tax_total: 'Total tax',
+    total_gross: 'Invoice total',
+    tax_mode: 'Tax treatment',
+    description: 'Item description',
+    sku: 'SKU',
+    po_line_no: 'PO line reference',
+    quantity: 'Quantity',
+    unit_price: 'Unit price',
+    price_basis: 'Price includes / excludes tax',
+    tax_rate: 'Combined tax rate (%)',
+    net_amount: 'Line amount before tax',
+    tax_amount: 'Line tax amount',
+    gross_amount: 'Line amount including tax',
+  };
+  return (parts.length === 3 ? `Line ${parts[1]} · ` : '') + (names[key] ?? pretty(key));
+};
 export const reasonLabel = (code?: string | null) =>
   (
     ({

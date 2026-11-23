@@ -134,6 +134,16 @@ Mock mode accepts only its exact generated fixture PDFs and labels their extract
 
 ## Fixture sequence
 
+For exact fields to create your own happy-path and edge-case PDFs, use [the manual invoice sheet](DEMO_INVOICES.md). It includes matching PO/vendor values, GSTINs, tax calculations, dependencies and the expected final balances.
+
+For a fresh demonstration, newly created disposable role workspaces enable **Overview → Reset demo data** for the reviewer. This is separate from `scripts.demo reset`, which removes a marked local workspace's schemas after its processes are stopped. The UI reset keeps the existing workspace/credentials and restores the prepared three vendors/four POs with zero approvals. It deletes all submitted PDFs, history, reviews, approvals, custom masters and OpenAI connections; every submitter must reconnect OpenAI. It requires typed **RESET DEMO**, refuses active workers and changed previews, and retains replay receipts.
+
+For a hosted assignment workspace, apply the reviewed migration through **0011_demo_reset** first, then explicitly set **DEMO_RESET_ENABLED=true** on the API with **ACCESS_MODE=roles**, its reviewer credential and the existing dedicated **DATABASE_SCHEMA**. Leave it false when history must be retained. Keep the worker configured for the restored **policy-1.1-demo** baseline. Normal API/worker code deployment and migrations are separate operations; this feature does not activate a worker, change static tokens or run a model. Public reviewer access shares reset authority when enabled. No existing hosted/local records are reset merely by installing this code or migrating.
+
+If reset says a worker is processing, wait for it to finish; an expired lease alone is not proof the worker stopped. If activity changed, refresh the preview and confirm again. If a response was lost, retry the same dialog/request so the original receipt is replayed without clearing newer work.
+
+The run's physical ownership lock blocks a live owned worker. As with ordinary crash recovery/disconnect, a previously dispatched OpenAI request can still complete and incur charges after a database connection disappears; deleting the stored connection cannot cancel that external request. Ownership fencing prevents stale processing from writing back into the reset workspace.
+
 | PDF                      | Expected behavior with the prepared masters                                              |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
 | `H1.pdf`                 | Approve ₹11,800 once on PO-001; remaining cap ₹38,200                                    |
@@ -149,6 +159,35 @@ For `PO-created-invoice.pdf`, finance creates **PO-CREATED** for **Aster Office 
 
 Finance can register other vendors and create orders through the UI. The fixture mock extractor still accepts only its prepared PDFs; arbitrary custom invoices require a real personal-key workspace. An already approved invoice identity remains a duplicate, even if uploaded again under another submitter.
 
+## Populate hosted demo masters
+
+The operator can add the prepared synthetic vendor/PO dataset directly to the hosted PostgreSQL database. This is a separate command from the loopback-only local demo tooling. It does not transfer local invoices, keys, runs or approvals. Use the existing ignored deployment environment file with the intended DATABASE_URL and explicit DATABASE_SCHEMA; migrate it through the current head **0011_demo_reset** first. Never publish that file or paste credentials into SQL Editor.
+
+From **backend** in CMD, preview the changes for schema **ps1_app**:
+
+```cmd
+uv run --locked --env-file ..\.local\deployment.env python -m scripts.hosted seed-demo --confirm-demo ps1-demo-v1 --confirm-schema ps1_app
+```
+
+The default **DRY_RUN** checks the connection's schema, migration head, unchanged `policy-1.1-demo` and existing masters without writing data. Review its counts and PO references. If this is the intended target, apply the same dataset:
+
+```cmd
+uv run --locked --env-file ..\.local\deployment.env python -m scripts.hosted seed-demo --confirm-demo ps1-demo-v1 --confirm-schema ps1_app --apply
+```
+
+Replace `ps1_app` in the command only when your configured dedicated schema differs. This operation reads only explicitly supplied environment values; it does not fall back to backend/.env. It adds missing compatible records and immutable creation audits in one locked transaction. Repeating it preserves IDs, allocations, counters and history. Conflicting policy, identity, status or PO terms stop the entire setup; no existing vendor is reactivated and no budget is reset.
+
+| Approved synthetic vendor | PO reference | Authorized gross cap | Line tax | Full line gross |
+| --- | --- | --- | --- | --- |
+| Aster Office Supplies | PO-001 | INR 50,000.00 | 18% | INR 118,000.00 |
+| Aster Industrial Supplies | PO-PARTIAL | INR 100,000.00 | 0% | INR 100,000.00 |
+| Aster Technology Services | PO-SELECT-001 | INR 25,000.00 | 18% | INR 118,000.00 |
+| Aster Technology Services | PO-SELECT-002 | INR 40,000.00 | 18% | INR 118,000.00 |
+
+All four orders are issued **2026-10-01**, OPEN, INR, with one **PAPER / Office paper** line: quantity **100**, net unit price **1000**. Their independent spending caps are unchanged. The dataset uses synthetic tax IDs and bank last-four 1234. Fresh masters have zero allocations; the policy is registered only if absent and identical values are required if present.
+
+Refresh **Purchase orders** as the reviewer to see them. Upload the actual generated PDFs as a submitter using a personal OpenAI connection and a running hosted worker. Seeding neither activates the worker nor calls OpenAI. For E1, genuinely process `E1-prior.pdf` before `E1.pdf`; for E3, process H1 first. `PO-CREATED` remains a separate reviewer-created order exercise. The add-only seeder does not reset history or balances; use the separately enabled reviewer reset described above for that purpose. No pre-approved invoice history is seeded.
+
 ## Update an existing local workspace
 
 Stop only that workspace's API/worker with Ctrl+C. From backend:
@@ -158,8 +197,8 @@ uv sync --locked
 uv run python -m scripts.demo migrate --name assignment-local
 ```
 
-Restart the same API/worker commands, update frontend dependencies with `npm.cmd ci`, restart Vite and reconnect. Migration validates the loopback server/schema ownership marker, upgrades business/checkpoint schemas and preserves records; it does not reseed or reset. Current head is **0010_vendor_management**. API and worker both need the new blacklist validation. Downgrade refuses while BLACKLISTED vendors would lose their status.
+Restart the same API/worker commands, update frontend dependencies with `npm.cmd ci`, restart Vite and reconnect. Migration validates the loopback server/schema ownership marker, upgrades business/checkpoint schemas and preserves records; it does not reseed or reset. Current head is **0011_demo_reset**. API and worker need matching reviewed source versions. Downgrade refuses while BLACKLISTED vendors would lose their status.
 
-Reset is deliberately separate and destroys only a specifically confirmed disposable demo's schemas. It is not an installation, update or troubleshooting step. Hosted operations and credentials belong to the operator, outside these local commands.
+The CLI `scripts.demo reset` is deliberately separate and removes only a specifically confirmed disposable demo's schemas. The new reviewer UI reset is an in-place, confirmed data reset when explicitly enabled; it retains schemas and migration metadata. Neither reset is an installation or migration step. Hosted operations and credentials belong to the operator, outside these local commands.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for regression/build checks and [the troubleshooting table](../README.md#troubleshooting) for access, upload and queued-run failures.

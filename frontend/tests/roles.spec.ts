@@ -449,7 +449,9 @@ test.describe('Workspace entry and role navigation', () => {
       .getByLabel('Vendor authorization rationale', { exact: true })
       .fill('Synthetic supplier restriction for browser testing.');
     await add.getByRole('button', { name: 'Save vendor', exact: true }).click();
-    await expect(manager.getByRole('status')).toContainText('Vendor added');
+    await expect(manager.getByRole('status').filter({ hasText: 'Vendor added' })).toContainText(
+      'Vendor added',
+    );
     await expect(manager.getByLabel('Vendor directory')).toContainText('Blacklisted');
     await manager.getByRole('button', { name: 'Add vendor', exact: true }).click();
     await add.getByLabel('Legal vendor name', { exact: true }).fill('Custom supplies & Services');
@@ -664,4 +666,85 @@ test.describe('Workspace entry and role navigation', () => {
     expect(data.lines[0].committed_quantity).toBe('10.000000');
     await submitter.close();
   });
+});
+
+test('reviewer confirms demo reset, cancels safely and replays a lost response without deleting new work', async ({
+  page,
+}) => {
+  test.skip(!enabled, 'Only the isolated role demo enables reset');
+  await connect(page, values.REVIEWER_API_TOKEN, '/?view=overview');
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset demo data', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reset demo workspace' });
+  await expect(dialog).toBeVisible();
+  const reset = dialog.getByRole('button', { name: 'Clear data & restore demo' });
+  await expect(reset).toBeDisabled();
+  await expect(dialog).toContainText('Custom vendors and purchase orders are removed');
+  await dialog.getByRole('button', { name: 'Cancel reset' }).click();
+  await expect(dialog).not.toBeVisible();
+  const original = await page.request.get('/api/v1/runs', {
+    headers: { Authorization: 'Bearer ' + values.REVIEWER_API_TOKEN },
+  });
+  expect((await original.json()).total_count).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Reset demo data', exact: true }).click();
+  await expect(dialog.getByLabel('Type RESET DEMO to clear data for everyone')).toBeEnabled();
+  await dialog.getByLabel('Type RESET DEMO to clear data for everyone').fill('RESET DEMO');
+  await expect(reset).toBeEnabled();
+  const keys: string[] = [];
+  let lose = true;
+  await page.route('**/api/v1/demo/reset', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    keys.push(route.request().headers()['x-idempotency-key']);
+    if (lose) {
+      lose = false;
+      const response = await route.fetch();
+      expect(response.status()).toBe(201);
+      return route.abort();
+    }
+    return route.continue();
+  });
+  await reset.click();
+  await expect(dialog.getByRole('alert')).toContainText('Cannot reach the server');
+  const newer = await page.request.post('/api/v1/invoices/process', {
+    headers: {
+      Authorization: 'Bearer ' + values.APP_API_TOKEN,
+      'X-Idempotency-Key': 'after-demo-reset',
+    },
+    multipart: {
+      file: {
+        name: 'H1.pdf',
+        mimeType: 'application/pdf',
+        buffer: readFileSync(resolve(directory, 'H1.pdf')),
+      },
+    },
+  });
+  expect(newer.status()).toBe(202);
+  await reset.click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Demo reset complete' })).toBeVisible();
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBe(keys[1]);
+  const history = await page.request.get('/api/v1/runs', {
+    headers: { Authorization: 'Bearer ' + values.REVIEWER_API_TOKEN },
+  });
+  expect((await history.json()).total_count).toBe(1);
+  const po = await page.request.get('/api/v1/purchase-orders', {
+    headers: { Authorization: 'Bearer ' + values.REVIEWER_API_TOKEN },
+  });
+  expect((await po.json()).total_count).toBe(4);
+  const submitter = await page.context().newPage();
+  await connect(submitter, values.APP_API_TOKEN, '/?view=history');
+  await expect(submitter.getByRole('button', { name: 'Reset demo data', exact: true })).toHaveCount(
+    0,
+  );
+  const forbidden = await submitter.request.get('/api/v1/demo/reset', {
+    headers: { Authorization: 'Bearer ' + values.APP_API_TOKEN },
+  });
+  expect(forbidden.status()).toBe(403);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByRole('button', { name: 'Reset demo data', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await dialog.getByRole('button', { name: 'Cancel reset' }).click();
+  await submitter.close();
 });

@@ -8,9 +8,11 @@
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | [Main README](../README.md)                    | Project purpose, role-based walkthrough, screenshots, PO balance explanation, scenarios and deployment status |
 | [Run locally](RUNNING.md)                      | Windows CMD prerequisites, dependencies, database setup, API/worker/frontend and generated PDFs               |
+| [Manual invoices and reset](DEMO_INVOICES.md)  | Exact fields for nine manual PDFs, matching PO/GSTIN data, reset steps, expected outcomes and balances |
 | [Development and verification](DEVELOPMENT.md) | Repository map, regression/build/migration commands and dated measured results                                |
 | [Role access](ROLE_ACCESS.md)                  | Submitter ownership, reviewer permissions and public assignment identities                                    |
 | [Security](SECURITY.md)                        | Credential types, encrypted expiring OpenAI sessions and public-demo boundaries                               |
+| [Extraction prompt and storage](EXTRACTION.md) | Exact instructions, PDF request shape, example fields, private storage and review comparisons |
 | [SPEC](../SPEC.md)                             | Canonical product, financial, API and workflow contract; planned features are not implementation claims       |
 | [Decisions](DECISIONS.md)                      | Agreed architecture/policy choices and unresolved details                                                     |
 | [Benchmark evidence](benchmarks/README.md)     | Sanitized model/extraction measurements and dated token-rate assumptions                                      |

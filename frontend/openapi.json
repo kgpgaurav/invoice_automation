@@ -403,6 +403,93 @@
         }
       }
     },
+    "/api/v1/demo/reset": {
+      "get": {
+        "summary": "Preview",
+        "operationId": "preview_api_v1_demo_reset_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPreview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Execute",
+        "operationId": "execute_api_v1_demo_reset_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-idempotency-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "X-Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetRecorded"
+                }
+              }
+            }
+          },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetRecorded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access": {
       "get": {
         "summary": "Get Access",
@@ -1491,6 +1578,48 @@
             },
             "type": "array",
             "title": "Pages"
+          },
+          "required_for_approval": {
+            "type": "boolean",
+            "title": "Required For Approval",
+            "default": true
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "printed",
+                  "derived"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "original_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Value"
+          },
+          "calculation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculation"
           }
         },
         "type": "object",
@@ -2313,6 +2442,105 @@
         ],
         "title": "ProviderConnection"
       },
+      "ResetPreview": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset",
+            "default": "ps1-demo-v1"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "ResetPreview"
+      },
+      "ResetRecorded": {
+        "properties": {
+          "reset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reset Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "removed_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Removed Counts"
+          },
+          "restored_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Restored Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reset_id",
+          "dataset",
+          "removed_counts",
+          "restored_counts"
+        ],
+        "title": "ResetRecorded"
+      },
+      "ResetRequest": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "const": "ps1-demo-v1",
+            "title": "Dataset"
+          },
+          "snapshot": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Snapshot"
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "RESET DEMO",
+            "title": "Confirmation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset",
+          "snapshot",
+          "confirmation"
+        ],
+        "title": "ResetRequest"
+      },
       "ReviewAccepted": {
         "properties": {
           "run_id": {
@@ -2393,6 +2621,120 @@
           "remaining_gross"
         ],
         "title": "ReviewCandidate"
+      },
+      "ReviewComparison": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "invoice_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Value"
+          },
+          "expected_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Value"
+          },
+          "expected_label": {
+            "type": "string",
+            "title": "Expected Label"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matches",
+              "different",
+              "missing",
+              "unverified",
+              "information"
+            ],
+            "title": "Status"
+          },
+          "source_verification": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "missing"
+            ],
+            "title": "Source Verification"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Pages",
+            "default": []
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "RECORDED_ASSESSMENT",
+              "CURRENT_MASTER",
+              "SOURCE_ONLY"
+            ],
+            "title": "Provenance"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "title",
+          "invoice_value",
+          "expected_value",
+          "expected_label",
+          "status",
+          "source_verification",
+          "provenance",
+          "description"
+        ],
+        "title": "ReviewComparison"
       },
       "ReviewPayload": {
         "properties": {
@@ -2830,6 +3172,14 @@
                 "type": "null"
               }
             ]
+          },
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewComparison"
+            },
+            "type": "array",
+            "title": "Comparisons",
+            "default": []
           }
         },
         "type": "object",

@@ -18,6 +18,7 @@ import InvoiceDecision from './InvoiceDecision';
 import RuleChecklist from './RuleChecklist';
 import BusinessTimeline from './BusinessTimeline';
 import ReviewDetail from './ReviewDetail';
+import ReviewComparisons from './ReviewComparisons';
 const PDFPreview = lazy(() => import('./PDFPreview'));
 
 export default function RunView({
@@ -305,6 +306,9 @@ export default function RunView({
                 )}
               </section>
               <RuleChecklist run={run} />
+              {run.job_state === 'WAITING_REVIEW' && (
+                <ReviewComparisons run={run} pdf={pdf} showPage={source} />
+              )}
               {!!run.verification_findings.length && (
                 <section className="findings">
                   <strong>Source evidence needs review</strong>
@@ -344,14 +348,19 @@ export default function RunView({
                     <div className="field-list">
                       {run.fields.map((field) => (
                         <div className="field-row" key={field.field}>
-                          <span>{fieldTitle(field.field)}</span>
+                          <span>
+                            {fieldTitle(field.field)}
+                            {field.required_for_approval === false && ' · optional'}
+                          </span>
                           <strong
                             className={
                               /amount|subtotal|total|price/.test(field.field) ? 'amount' : ''
                             }
                           >
                             {field.value == null
-                              ? 'Missing'
+                              ? field.required_for_approval === false
+                                ? 'Not supplied'
+                                : 'Missing'
                               : /amount|subtotal|total|price$/.test(field.field) &&
                                   field.field !== 'price_basis'
                                 ? money(field.value, run.invoice_currency ?? '')
@@ -359,8 +368,14 @@ export default function RunView({
                           </strong>
                           <div>
                             <small className={'verification ' + field.verification}>
-                              {pretty(field.verification)}
+                              {field.origin === 'derived'
+                                ? 'Calculated locally'
+                                : field.verification === 'missing' &&
+                                    field.required_for_approval === false
+                                  ? 'Optional'
+                                  : pretty(field.verification)}
                             </small>
+                            {field.calculation && <small>{field.calculation}</small>}
                             {field.verification === 'verified' &&
                               field.pages.map((page) => (
                                 <button

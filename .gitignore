@@ -1,34 +1,75 @@
+# Private configuration; example templates are safe to publish.
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+!*.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies, environments, generated builds and caches.
 .venv/
+venv/
+env/
 .local/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+*.egg-info/
 node_modules/
 dist/
+build/
 *.tsbuildinfo
-test-results/
-playwright-report/
+
+# Local documents/database contents and exports, never application source.
 *.pdf
-!docs/archive/*.pdf
 uploads/
 pgdata/
 *.db
 *.sqlite*
-*.pem
-*.key
-*.log
-venv/
-env/
-output/playwright/
+*.dump
+*.backup
+*.sql.gz
+/backups/
+/dumps/
+
+# Generated browser captures, test/coverage reports and logs.
+/output/
 .playwright-cli/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+junit*.xml
+*.log
+
+# Publish only screenshots used by the public README. Add an explicit exception
+# when a public guide needs a new image; other test captures remain local.
+/docs/screenshots/*
+!/docs/screenshots/ui-2026-11-18/
+/docs/screenshots/ui-2026-11-18/*
+!/docs/screenshots/ui-2026-11-18/review-queue.png
+!/docs/screenshots/ui-2026-11-18/vendors-desktop.png
+!/docs/screenshots/ui-2026-11-18/create-po-desktop.png
+!/docs/screenshots/ui-2026-11-18/po-totals-desktop.png
 
 # Personal operator runbooks and implementation journals; public guides stay tracked.
 /docs/local/
+/docs/private/
 /docs/PREDEPLOY.md
+/docs/predeploy.md
 /docs/REVIEWER_KEYS.md
 /docs/KEYS.md
 /docs/keys.md
@@ -37,16 +78,26 @@ output/playwright/
 /docs/PHASE1.md
 /PROGRESS.md
 /design-qa.md
+/PREDEPLOY.md
+/predeploy.md
+/KEYS.md
+/keys.md
+
+# Accidental command-output file; preserve the local copy.
+/, PO totals and submission guides*
 
 # Local editor/agent state, backups, database exports and sharing archives.
 /.vscode/
 /.idea/
 /.codex/
 /.agents/
+.vercel/
+.history/
 *.bak
 *.tmp
-*.dump
-*.backup
+*.swp
+*.swo
+*~
 *.zip
 *.7z
 *.rar

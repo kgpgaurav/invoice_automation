@@ -1,10 +1,11 @@
 import { dateTime, money, type Run, type RunEvent, type Review } from './api';
-import { Badge, Icon, Link, Mode, pretty, type Navigate } from './ui';
+import { Badge, Icon, Link, Mode, fieldLabel, type Navigate } from './ui';
 import DocumentPanel from './DocumentPanel';
 import ReviewForm from './ReviewForm';
 import InvoiceDecision from './InvoiceDecision';
 import RuleChecklist from './RuleChecklist';
 import BusinessTimeline from './BusinessTimeline';
+import ReviewComparisons from './ReviewComparisons';
 
 export default function ReviewDetail({
   run,
@@ -86,6 +87,7 @@ export default function ReviewDetail({
         <InvoiceDecision run={run} navigate={navigate} />
       )}
       <DocumentPanel url={pdf} error={pdfError} />
+      <ReviewComparisons run={run} pdf={pdf} />
       {review ? (
         <ReviewForm
           key={review.review_request_id}
@@ -111,19 +113,32 @@ export default function ReviewDetail({
           </p>
         </div>
       )}
+      <RuleChecklist run={run} />
       <details className="review-evidence">
-        <summary>Checks & recorded evidence</summary>
-        <RuleChecklist run={run} />
+        <summary>Extracted fields & source evidence</summary>
         <dl className="review-field-list">
           {run.fields.map((field) => (
             <div key={field.field}>
-              <dt>{pretty(field.field)}</dt>
+              <dt>
+                {fieldLabel(field.field)}
+                {field.required_for_approval === false && ' · optional'}
+              </dt>
               <dd>
-                {field.value ?? 'Missing'}
+                {field.value ??
+                  (field.required_for_approval === false ? 'Not supplied' : 'Missing')}
                 <small>
-                  {pretty(field.verification)}
+                  {field.origin === 'derived'
+                    ? 'Calculated locally from printed values'
+                    : field.verification === 'verified'
+                      ? 'Matched to PDF text'
+                      : field.verification === 'missing' && field.required_for_approval === false
+                        ? 'Optional field'
+                        : field.verification === 'missing'
+                          ? 'Required information missing'
+                          : 'Source needs verification'}
                   {field.pages.length > 0 && ' · page ' + field.pages.join(', ')}
                 </small>
+                {field.calculation && <small>{field.calculation}</small>}
               </dd>
             </div>
           ))}

@@ -21,6 +21,7 @@ export default function InvoiceDecision({ run, navigate }: { run: Run; navigate:
                 : 'Queued for processing';
   const explanation =
     run.processing_failure?.message ??
+    run.decision_reason ??
     run.business_explanation ??
     (outcome === 'FAILED'
       ? 'A technical error stopped processing. This is not a financial rejection.'
