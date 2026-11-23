@@ -71,7 +71,10 @@ class ReviewAction(Base):
     __tablename__ = "review_actions"
     __table_args__ = (
         UniqueConstraint("review_request_id", "idempotency_key"),
-        CheckConstraint("action IN ('SELECT_PO','REJECT','REQUEST_INFO')"),
+        CheckConstraint(
+            "action IN ('SELECT_PO','PASS','REJECT','REQUEST_INFO')",
+            name="ck_review_actions_action",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     review_request_id: Mapped[UUID] = mapped_column(ForeignKey("review_requests.id"), unique=True)

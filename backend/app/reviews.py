@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.events import append_event
 from app.models import QueueItem, Run
-from app.review_contracts import ReviewAccepted
+from app.review_contracts import ReviewAccepted, allowed_review_actions
 from app.workflow_models import ReviewAction, ReviewRequest, WorkflowRun
 
 
@@ -55,6 +55,8 @@ def respond(engine, review_id, body, key, actor):
             request.kind != "PO_SELECTION" or str(body.payload.po_id) not in request.options_json
         ):
             raise ReviewConflict("PO was not offered for this review")
+        if body.action not in allowed_review_actions(request.kind):
+            raise ReviewConflict("Action is not offered for this review")
         run = session.scalar(select(Run).where(Run.id == request.run_id).with_for_update())
         if run.job_state != "WAITING_REVIEW" or run.decision != "NEEDS_REVIEW":
             raise ReviewConflict("Run is not awaiting this review")

@@ -11,7 +11,12 @@ from fastapi import HTTPException
 from sqlalchemy import String, and_, cast, func, or_, select
 
 from app.access import submitter_reason
-from app.evidence_verification import LAYOUT_VERIFIERS, SUPPORTED_VERIFIERS, verify
+from app.evidence_verification import (
+    DIAGNOSTIC_VERIFIERS,
+    LAYOUT_VERIFIERS,
+    SUPPORTED_VERIFIERS,
+    verify,
+)
 from app.extraction_schema import EXTRA_HEADERS, EXTRA_LINES, parse_extraction
 from app.extraction_store import APIUsage
 from app.financial_models import ApprovalLedger, FinancialAssessment, PurchaseOrder, Vendor
@@ -245,7 +250,9 @@ def detail(session, run):
             source_found = bool(evidence or local_source.get("grounded"))
             source_page = evidence.page if evidence else local_source.get("page")
             extra = path.rsplit(".", 1)[-1] in (*EXTRA_HEADERS, *EXTRA_LINES)
-            if extra:
+            # Source support belongs to each field. An unrelated financial typing
+            # failure must not hide an already verified/derived value behind a raw null.
+            if extra or source_found:
                 value = local_source.get("normalized_value", value)
             fields.append(
                 ExtractedField(
@@ -282,7 +289,8 @@ def detail(session, run):
         for index, line in enumerate(wire.get("line_items", []), 1):
             number = (
                 index
-                if work.verifier_version in LAYOUT_VERIFIERS and normalized
+                if work.verifier_version in LAYOUT_VERIFIERS
+                and (normalized or work.verifier_version in DIAGNOSTIC_VERIFIERS)
                 else line.get("line_no")
             )
             for key in (

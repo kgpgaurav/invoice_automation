@@ -8,6 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.events import append_event
+from app.evidence_verification import verify
+from app.extraction_schema import InvoiceExtractionV12
+from app.financial_models import ApprovalLedger
 from app.main import create_app
 from app.models import QueueItem, Run
 from app.read_service import processing_time
@@ -15,6 +18,9 @@ from app.streaming import event_stream
 from tests.conftest import TOKEN
 from tests.extraction_helpers import case
 from tests.financial_fixtures import masters
+from tests.ordinary_invoices import invoice
+from tests.test_ordinary_invoices import ordinary_masters
+from tests.test_ordinary_workflow import processor as ordinary_processor
 from tests.workflow_helpers import execute, intake, mock_processor
 
 
@@ -118,6 +124,37 @@ def test_sse_reconnect_uses_persisted_sequence_and_validates_cursor(client, data
     for headers in ({"Last-Event-ID": "bad"}, {"Last-Event-ID": "-1"}, {"Last-Event-ID": "100"}):
         assert client.get(path, headers=headers).status_code == 422
     assert client.get(f"/api/v1/runs/{uuid4()}/events/stream").status_code == 404
+
+
+def test_supported_values_survive_an_unrelated_financial_contract_failure(workflow_db, settings):
+    engine = workflow_db
+    ordinary_masters(engine)
+    pdf, raw = invoice(layout="footer", numbered=False)
+    data = raw.model_dump()
+    data["line_items"][0]["unit_price"] = "2500.00001"
+    wire = InvoiceExtractionV12.model_validate(data)
+    checked = verify(wire, pdf)
+    assert checked.document is None and "FINANCIAL_CONTRACT_INVALID" in checked.findings
+    ident = intake(engine, pdf)
+    handler, _ = ordinary_processor(engine, wire)
+    execute(engine, handler)
+    with TestClient(create_app(settings, engine)) as client:
+        client.headers["Authorization"] = f"Bearer {TOKEN}"
+        detail = client.get(f"/api/v1/runs/{ident}").json()
+    fields = {f["field"]: f for f in detail["fields"]}
+    assert detail["decision"] == "NEEDS_REVIEW" and detail["approved_gross"] is None
+    assert fields["tax_total"]["value"] == "1350.00"
+    assert fields["tax_total"]["original_value"] is None
+    assert fields["tax_total"]["verification"] == "verified"
+    assert fields["tax_total"]["extraction_state"] == "DERIVED"
+    assert fields["tax_total"]["calculation"] and fields["tax_total"]["pages"] == [1]
+    assert fields["lines.1.quantity"]["verification"] == "verified"
+    assert fields["lines.1.tax_amount"]["value"] == "1350.00"
+    assert fields["lines.1.tax_amount"]["origin"] == "derived"
+    assert fields["lines.1.unit_price"]["value"] == "2500.00001"
+    assert fields["lines.1.unit_price"]["financial_validation_errors"]
+    with Session(engine) as session:
+        assert session.scalar(select(ApprovalLedger)) is None
 
 
 def test_stream_cancel_releases_connections(database, pdf):

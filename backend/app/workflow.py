@@ -31,6 +31,7 @@ from app.financial_models import PolicyVersion, PurchaseOrder, Vendor
 from app.models import Document, QueueItem, Run
 from app.owned_finalizer import finalize_owned
 from app.ownership import owned_session
+from app.review_contracts import allowed_review_actions
 from app.workflow_models import ReviewAction, ReviewRequest, WorkflowRun
 
 GRAPH_VERSION = "invoice-graph-1"
@@ -376,7 +377,7 @@ class WorkflowProcessor:
                         + (
                             "Select an evidenced PO; all financial checks will run again."
                             if options
-                            else "Reject or request corrected source information."
+                            else "Pass for recheck, reject, or request corrected information."
                         ),
                         options_json=options,
                     )
@@ -396,12 +397,9 @@ class WorkflowProcessor:
                 {
                     "review_request_id": state["review_request_id"],
                     "generation": state["generation"],
-                    "question": "Select a PO or stop for corrected source information.",
+                    "question": "Choose an offered PO, pass for recheck, or request information.",
                     "options": state["review_options"],
-                    "allowed_actions": (
-                        ["SELECT_PO"] if state["review_kind"] == "PO_SELECTION" else []
-                    )
-                    + ["REJECT", "REQUEST_INFO"],
+                    "allowed_actions": allowed_review_actions(state["review_kind"]),
                 }
             )
             return {"action_id": action_id}

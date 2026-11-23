@@ -12,7 +12,7 @@ class ReviewPayload(BaseModel):
 class ReviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     generation: int = Field(ge=1, strict=True)
-    action: Literal["SELECT_PO", "REJECT", "REQUEST_INFO"]
+    action: Literal["SELECT_PO", "PASS", "REJECT", "REQUEST_INFO"]
     payload: ReviewPayload
     reason: str = Field(min_length=1, max_length=500)
 
@@ -23,8 +23,16 @@ class ReviewResponse(BaseModel):
         ):
             raise ValueError("SELECT_PO requires po_id; other actions require an empty payload")
         if self.action != "SELECT_PO" and self.payload.model_fields_set:
-            raise ValueError("REJECT and REQUEST_INFO require payload:{}")
+            raise ValueError("PASS, REJECT and REQUEST_INFO require payload:{}")
         return self
+
+
+def allowed_review_actions(kind):
+    return (
+        (["SELECT_PO"] if kind == "PO_SELECTION" else [])
+        + (["PASS"] if kind in ("PO_SELECTION", "EVIDENCE_OR_POLICY") else [])
+        + ["REJECT", "REQUEST_INFO"]
+    )
 
 
 class ReviewCandidate(BaseModel):

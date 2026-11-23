@@ -3,6 +3,7 @@
 import hashlib
 import json
 from decimal import localcontext
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -14,6 +15,32 @@ from app.financial_models import ApprovalLedger, FinancialAssessment
 from app.models import Document, Run
 from app.ownership import owned_session
 from app.workflow_models import ReviewAction, ReviewRequest, WorkflowRun
+
+
+def prior_selected_po(session, run_id, generation):
+    """Reuse only an earlier immutable, authorized choice for this same document."""
+    choice = session.execute(
+        select(ReviewRequest, ReviewAction)
+        .join(ReviewAction, ReviewAction.review_request_id == ReviewRequest.id)
+        .where(
+            ReviewRequest.run_id == run_id,
+            ReviewRequest.generation < generation,
+            ReviewRequest.status == "RESOLVED",
+            ReviewAction.action == "SELECT_PO",
+        )
+        .order_by(ReviewRequest.generation.desc())
+        .limit(1)
+    ).first()
+    if choice is None:
+        return None
+    request, action = choice
+    if (
+        request.kind != "PO_SELECTION"
+        or set(action.payload_json) != {"po_id"}
+        or action.payload_json["po_id"] not in request.options_json
+    ):
+        raise ApprovalConflict("Earlier PO selection was not a stored candidate")
+    return UUID(action.payload_json["po_id"])
 
 
 def finalize_owned(worker, claim, *, post=True):
@@ -143,11 +170,17 @@ def finalize_owned(worker, claim, *, post=True):
                     or checked.document.po_reference is not None
                 ):
                     raise ApprovalConflict("PO selection cannot override printed evidence")
-                from uuid import UUID
-
                 selected_po = UUID(action.payload_json["po_id"])
                 if str(selected_po) not in request.options_json:
                     raise ApprovalConflict("PO selection was not a stored candidate")
+            elif action.action == "PASS":
+                if (
+                    request.kind not in ("PO_SELECTION", "EVIDENCE_OR_POLICY")
+                    or action.payload_json
+                ):
+                    raise ApprovalConflict("Invalid conditional pass action")
+                if checked.document and checked.document.po_reference is None:
+                    selected_po = prior_selected_po(session, run.id, request.generation)
             elif action.action == "REJECT":
                 forced = reject(
                     "REVIEWER_REJECTED",

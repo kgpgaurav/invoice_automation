@@ -38,7 +38,13 @@ from app.po_routes import add_po_routes
 from app.read_contracts import RunDetail, SubmitterRunDetail
 from app.read_routes import add_read_routes
 from app.read_service import detail, public_event
-from app.review_contracts import ReviewAccepted, ReviewCandidate, ReviewResponse, ReviewView
+from app.review_contracts import (
+    ReviewAccepted,
+    ReviewCandidate,
+    ReviewResponse,
+    ReviewView,
+    allowed_review_actions,
+)
 from app.reviews import ReviewConflict, respond
 from app.workflow_models import ReviewRequest
 
@@ -316,8 +322,7 @@ def create_app(
                 question=request.question,
                 options=candidates,
                 status=request.status,
-                allowed_actions=(["SELECT_PO"] if request.kind == "PO_SELECTION" else [])
-                + ["REJECT", "REQUEST_INFO"],
+                allowed_actions=allowed_review_actions(request.kind),
             )
 
     @app.post(
